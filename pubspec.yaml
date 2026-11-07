@@ -1,0 +1,63 @@
+name: bvm
+description: "BVM - private 1-to-1 messenger"
+publish_to: 'none'
+
+# versionName+versionCode for Android (CFBundleShortVersionString+CFBundleVersion on iOS).
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management + dependency injection.
+  flutter_riverpod: ^3.4.3
+
+  # Encrypted local database: Drift on SQLCipher (selected via the sqlite3 hook below).
+  drift: ^2.35.3
+  sqlite3: ^3.8.0
+  path: ^1.9.1
+  path_provider: ^2.1.6
+
+  # Android Keystore-backed storage for the database key, the Olm pickle key
+  # and the Supabase session.
+  flutter_secure_storage: ^11.2.0
+
+  # Backend: e-mail OTP auth, directory, key store, transient relay, Realtime.
+  supabase_flutter: ^2.18.3
+
+  # End-to-end encryption: Olm (Double Ratchet) via vodozemac (audited Rust).
+  vodozemac: ^0.9.0
+  flutter_vodozemac: ^0.9.0
+
+  # Argon2id password verifiers, SHA-256 safety numbers, CSPRNG, UUIDs.
+  hashlib: ^2.4.2
+
+  # Content-free push wake-ups (optional at runtime) and a generic local notification.
+  firebase_core: ^5.1.0
+  firebase_messaging: ^17.0.1
+  flutter_local_notifications: ^22.3.3
+
+  # Background auto-delete sweep while the app is closed.
+  workmanager: ^0.10.10
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  drift_dev: ^2.35.2
+  build_runner: ^2.17.1
+
+hooks:
+  user_defines:
+    sqlite3:
+      # Bundle the SQLCipher community build (encrypted SQLite) instead of plain SQLite.
+      source: sqlcipher
+
+flutter:
+  uses-material-design: true
+  assets:
+    # Shown in Settings > Privacy policy; single source of the policy text.
+    - PRIVACY_POLICY.md

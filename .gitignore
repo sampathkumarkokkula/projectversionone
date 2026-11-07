@@ -1,0 +1,59 @@
+# ---- Project-local toolchain (JDK, Flutter, Android SDK, Rust, caches) ----
+/.toolchain/
+
+# ---- Secrets: never commit ----
+.env
+.env.*
+!.env.example
+/.secrets/
+*.jks
+*.keystore
+android/key.properties
+google-services.json
+GoogleService-Info.plist
+supabase/.env
+supabase/.temp/
+supabase/functions/.env
+
+# ---- Flutter / Dart ----
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+/coverage/
+*.iml
+.metadata.bak
+
+# ---- Android ----
+android/.gradle/
+android/.kotlin/
+android/captures/
+android/local.properties
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/gradlew
+android/gradlew.bat
+android/gradle/wrapper/gradle-wrapper.jar
+**/GeneratedPluginRegistrant.*
+
+# ---- iOS (M3) ----
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/ephemeral/
+**/xcuserdata/
+
+# ---- Release artifacts copied by the build scripts ----
+/dist/
+
+# ---- IDE / OS / logs ----
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+*.log

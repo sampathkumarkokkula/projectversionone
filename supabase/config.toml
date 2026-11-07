@@ -1,0 +1,26 @@
+# Supabase CLI configuration for BVM (used by `supabase link`, `supabase db push`
+# and `supabase functions deploy`). Only the settings BVM depends on are listed;
+# everything else uses the CLI defaults.
+project_id = "bvm"
+
+[api]
+# Only the public schema is exposed through the Data API. The `private` schema
+# (encrypted phone numbers, FCM tokens) must never be added here.
+schemas = ["public", "graphql_public"]
+
+[auth]
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+# E-mail OTP: the Magic Link / Confirm signup templates must contain {{ .Token }}.
+otp_length = 6
+otp_expiry = 900
+
+# The functions verify the caller's access token themselves (auth.getUser), which
+# works with both the legacy JWT secret and the new asymmetric signing keys.
+[functions.push]
+verify_jwt = false
+
+[functions.delete-account]
+verify_jwt = false
