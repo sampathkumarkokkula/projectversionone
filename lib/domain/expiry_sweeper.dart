@@ -18,15 +18,21 @@ class ExpirySweeper {
   final AppDatabase db;
   final Clock clock;
 
-  /// Returns the number of messages deleted.
+  /// Photo parts that never got completed are dropped after this long.
+  static const Duration _stalePartsAfter = Duration(days: 7);
+
+  /// Returns the number of messages deleted. Photos go with their message.
   Future<int> sweep() => db.transaction(() async {
         final now = clock.nowMs();
+        await (db.delete(db.mediaParts)
+              ..where((p) => p.createdAt.isSmallerThanValue(now - _stalePartsAfter.inMilliseconds)))
+            .go();
         final expired = await (db.select(db.messages)
               ..where((m) => m.expiresAt.isNotNull() & m.expiresAt.isSmallerOrEqualValue(now)))
             .get();
         if (expired.isEmpty) return 0;
         for (final m in expired) {
-          if (m.fromMe && m.kind == MessageKind.text.name) {
+          if (m.fromMe && m.kind != MessageKind.system.name) {
             await db.into(db.pendingDeletes).insertOnConflictUpdate(
                   PendingDeletesCompanion.insert(messageId: m.id, chatId: m.chatId),
                 );

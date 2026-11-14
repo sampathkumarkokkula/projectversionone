@@ -5,8 +5,10 @@ import '../../data/local/app_database.dart';
 import '../../domain/models.dart';
 import '../chat/chat_screen.dart';
 import '../providers.dart';
+import '../search/search_screen.dart';
 import '../settings/settings_screen.dart';
 import '../util/format.dart';
+import '../widgets/avatar.dart';
 import 'new_chat_screen.dart';
 import 'reconnect_screen.dart';
 
@@ -22,6 +24,13 @@ class ChatListScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Chats'),
         actions: [
+          IconButton(
+            tooltip: 'Search messages',
+            icon: const Icon(Icons.search),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const SearchScreen()),
+            ),
+          ),
           IconButton(
             tooltip: 'Settings',
             icon: const Icon(Icons.settings_outlined),
@@ -119,15 +128,32 @@ class _ChatTile extends StatelessWidget {
     } else if (last.kind == MessageKind.system.name) {
       preview = last.body;
     } else {
-      preview = last.fromMe ? 'You: ${last.body}' : last.body;
+      final body = messagePreview(last);
+      preview = last.fromMe ? 'You: $body' : body;
     }
+    final label = chat.blocked
+        ? 'Blocked'
+        : !chat.accepted
+            ? 'Request'
+            : null;
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: scheme.primaryContainer,
-        foregroundColor: scheme.onPrimaryContainer,
-        child: Text(chat.peerUsername.isEmpty ? '?' : chat.peerUsername[0].toUpperCase()),
+      leading: AvatarCircle(ownerId: chat.peerId, name: chat.peerUsername),
+      title: Row(
+        children: [
+          Flexible(child: Text(chat.peerUsername, maxLines: 1, overflow: TextOverflow.ellipsis)),
+          if (label != null) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: chat.blocked ? scheme.errorContainer : scheme.secondaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(label, style: Theme.of(context).textTheme.labelSmall),
+            ),
+          ],
+        ],
       ),
-      title: Text(chat.peerUsername, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
         preview.replaceAll('\n', ' '),
         maxLines: 1,

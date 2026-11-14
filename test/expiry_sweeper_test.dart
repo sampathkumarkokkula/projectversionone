@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/fakes.dart';
 
 void main() {
-  const hour = Duration(hours: 1);
+  const day = Duration(days: 1);
   late FakeClock clock;
   late FakeRelayServer server;
   late FakeDirectory directory;
@@ -28,27 +28,27 @@ void main() {
 
   test('the timer applies only to messages sent after it was enabled', () async {
     final before = await alice.messages.sendText('bob', 'sent before the timer');
-    await alice.messages.setTimer('bob', hour.inSeconds);
+    await alice.messages.setTimer('bob', day.inSeconds);
     final after = await alice.messages.sendText('bob', 'sent with the timer');
 
     final rows = {for (final m in await alice.messagesWith('bob')) m.id: m};
     expect(rows[before]!.expiresAt, isNull);
-    expect(rows[after]!.expiresAt, clock.now + hour.inMilliseconds);
+    expect(rows[after]!.expiresAt, clock.now + day.inMilliseconds);
   });
 
   test('the sweep deletes exactly the expired messages and queues a relayed delete', () async {
-    await alice.messages.setTimer('bob', hour.inSeconds);
-    final mine = await alice.messages.sendText('bob', 'expires in one hour');
+    await alice.messages.setTimer('bob', day.inSeconds);
+    final mine = await alice.messages.sendText('bob', 'expires in one day');
     final untimed = await alice.messages.sendText('carol', 'no timer here');
 
-    clock.advance(const Duration(minutes: 30));
-    final laterMine = await alice.messages.sendText('bob', 'sent 30 minutes later');
+    clock.advance(const Duration(hours: 12));
+    final laterMine = await alice.messages.sendText('bob', 'sent 12 hours later');
 
     // Nothing has expired yet.
     expect(await sweeper.sweep(), 0);
 
-    // One hour after the first message: only that one is gone.
-    clock.advance(const Duration(minutes: 30));
+    // One day after the first message: only that one is gone.
+    clock.advance(const Duration(hours: 12));
     expect(await sweeper.sweep(), 1);
     final bobIds = (await alice.messagesWith('bob')).map((m) => m.id).toSet();
     expect(bobIds.contains(mine), isFalse);
@@ -65,46 +65,46 @@ void main() {
     expect(deletes.single.to, 'bob');
     expect((deletes.single.payload as DeletePayload).ids, [mine]);
 
-    // Thirty minutes more: the second timed message expires too.
-    clock.advance(const Duration(minutes: 30));
+    // Twelve hours more: the second timed message expires too.
+    clock.advance(const Duration(hours: 12));
     expect(await sweeper.sweep(), 1);
     expect((await alice.messagesWith('bob')).map((m) => m.id), isNot(contains(laterMine)));
   });
 
   test('expired messages are hidden even before the sweep runs', () async {
-    await alice.messages.setTimer('bob', hour.inSeconds);
+    await alice.messages.setTimer('bob', day.inSeconds);
     await alice.messages.sendText('bob', 'short-lived');
-    clock.advance(const Duration(hours: 2));
+    clock.advance(const Duration(days: 2));
 
     final visible = await alice.db.watchMessages('bob', now: clock.nowMs).first;
     expect(visible.where((m) => m.kind == 'text'), isEmpty);
   });
 
   test('received timed messages expire relative to the moment they were sent', () async {
-    final sentAt = clock.now - const Duration(minutes: 50).inMilliseconds;
-    final payload = TextPayload(id: 'm-1', body: 'hi', sentAt: sentAt, ttlSeconds: hour.inSeconds);
+    final sentAt = clock.now - const Duration(hours: 20).inMilliseconds;
+    final payload = TextPayload(id: 'm-1', body: 'hi', sentAt: sentAt, ttlSeconds: day.inSeconds);
     final env = await _incoming('bob', payload);
     await alice.messages.handleIncoming(env);
 
     final stored = (await alice.messagesWith('bob')).single;
-    expect(stored.expiresAt, sentAt + hour.inMilliseconds);
+    expect(stored.expiresAt, sentAt + day.inMilliseconds);
 
-    clock.advance(const Duration(minutes: 10));
+    clock.advance(const Duration(hours: 4));
     expect(await sweeper.sweep(), 1);
     expect(await alice.messagesWith('bob'), isEmpty);
   });
 
   test('free plan: a third timer chat is blocked', () async {
     await alice.connect('dave');
-    await alice.messages.setTimer('bob', hour.inSeconds);
+    await alice.messages.setTimer('bob', day.inSeconds);
     await alice.messages.setTimer('carol', 86400);
-    await expectLater(alice.messages.setTimer('dave', hour.inSeconds), throwsA(isA<TimerLimitReached>()));
+    await expectLater(alice.messages.setTimer('dave', day.inSeconds), throwsA(isA<TimerLimitReached>()));
     expect((await alice.db.chatById('dave'))!.timerSeconds, isNull);
     // Changing the duration of an existing timer chat is still allowed.
-    await alice.messages.setTimer('bob', 5 * 3600);
+    await alice.messages.setTimer('bob', 7 * 86400);
     // Freeing a slot makes room again.
     await alice.messages.setTimer('carol', null);
-    await alice.messages.setTimer('dave', hour.inSeconds);
+    await alice.messages.setTimer('dave', day.inSeconds);
   });
 }
 

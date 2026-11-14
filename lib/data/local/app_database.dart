@@ -25,6 +25,25 @@ class Chats extends Table {
   IntColumn get createdAt => integer()();
   IntColumn get lastActivityAt => integer()();
 
+  // ---- schema v2 ----
+
+  /// Blocked by this user (also enforced on the server).
+  BoolColumn get blocked => boolean().withDefault(const Constant(false))();
+
+  /// False for a chat someone else started ("message request") until this
+  /// user accepts or replies. No receipts and no profile picture go to a
+  /// request.
+  BoolColumn get accepted => boolean().withDefault(const Constant(true))();
+
+  /// Own profile version last sent to this peer.
+  IntColumn get profileSentVersion => integer().withDefault(const Constant(0))();
+
+  /// The peer announced a profile change; re-read their username.
+  BoolColumn get refreshProfile => boolean().withDefault(const Constant(false))();
+
+  /// Last time the peer's username was checked against the directory.
+  IntColumn get directoryCheckedAt => integer().withDefault(const Constant(0))();
+
   @override
   Set<Column<Object>> get primaryKey => {peerId};
 }
@@ -50,9 +69,55 @@ class Messages extends Table {
   /// [MessageStatus] name.
   TextColumn get status => text()();
 
+  /// Id of the message this one replies to (schema v2).
+  TextColumn get replyTo => text().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
+
+/// JPEG bytes of a photo message. Deleted together with its message.
+@DataClassName('MediaItem')
+class Media extends Table {
+  TextColumn get messageId => text().references(Messages, #id, onDelete: KeyAction.cascade)();
+  BlobColumn get bytes => blob()();
+  IntColumn get width => integer()();
+  IntColumn get height => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {messageId};
+}
+
+/// Parts of an incoming photo until all of them have arrived.
+class MediaParts extends Table {
+  TextColumn get messageId => text()();
+  IntColumn get part => integer()();
+  TextColumn get chatId => text()();
+  IntColumn get total => integer()();
+  BlobColumn get data => blob()();
+  IntColumn get sentAt => integer()();
+  IntColumn get ttlSeconds => integer().nullable()();
+  IntColumn get width => integer()();
+  IntColumn get height => integer()();
+  TextColumn get sha256 => text()();
+  TextColumn get replyTo => text().nullable()();
+  IntColumn get createdAt => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {messageId, part};
+}
+
+/// Profile pictures: own one under [selfAvatarId], peers' ones under their id.
+class Avatars extends Table {
+  TextColumn get ownerId => text()();
+  BlobColumn get bytes => blob()();
+  IntColumn get updatedAt => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {ownerId};
+}
+
+const String selfAvatarId = 'self';
 
 /// Pickled (encrypted with the Olm pickle key) Olm sessions.
 class OlmSessions extends Table {
@@ -119,18 +184,50 @@ class ChatSummary {
   final Message? lastMessage;
 }
 
+/// A search hit: the message and the chat it belongs to.
+class SearchHit {
+  const SearchHit(this.message, this.chat);
+
+  final Message message;
+  final Chat chat;
+}
+
 @DriftDatabase(
-  tables: [Chats, Messages, OlmSessions, Outbox, PendingDeletes, ProcessedEnvelopes, KeyValues],
+  tables: [
+    Chats,
+    Messages,
+    Media,
+    MediaParts,
+    Avatars,
+    OlmSessions,
+    Outbox,
+    PendingDeletes,
+    ProcessedEnvelopes,
+    KeyValues,
+  ],
 )
 class AppDatabase extends _$AppDatabase implements LocalSettings {
   AppDatabase(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.addColumn(chats, chats.blocked);
+            await m.addColumn(chats, chats.accepted);
+            await m.addColumn(chats, chats.profileSentVersion);
+            await m.addColumn(chats, chats.refreshProfile);
+            await m.addColumn(chats, chats.directoryCheckedAt);
+            await m.addColumn(messages, messages.replyTo);
+            await m.createTable(media);
+            await m.createTable(mediaParts);
+            await m.createTable(avatars);
+          }
+        },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
         },
@@ -234,14 +331,66 @@ class AppDatabase extends _$AppDatabase implements LocalSettings {
   Future<void> setStatus(String messageId, MessageStatus status) =>
       (update(messages)..where((m) => m.id.equals(messageId))).write(MessagesCompanion(status: Value(status.name)));
 
+  Future<Message?> messageById(String id) =>
+      (select(messages)..where((m) => m.id.equals(id))).getSingleOrNull();
+
+  /// Text messages containing [query] (case-insensitive for ASCII), newest
+  /// first, optionally within one chat. Expired messages are excluded.
+  Future<List<SearchHit>> searchMessages(String query, {String? chatId, required int now, int limit = 100}) {
+    final escaped = query.replaceAll(r'\', r'\\').replaceAll('%', r'\%').replaceAll('_', r'\_');
+    final q = select(messages).join([innerJoin(chats, chats.peerId.equalsExp(messages.chatId))])
+      ..where(messages.kind.equals(MessageKind.text.name) &
+          messages.body.like('%$escaped%', escapeChar: r'\') &
+          (messages.expiresAt.isNull() | messages.expiresAt.isBiggerThanValue(now)))
+      ..orderBy([OrderingTerm.desc(messages.localAt)])
+      ..limit(limit);
+    if (chatId != null) q.where(messages.chatId.equals(chatId));
+    return q.get().then((rows) => [
+          for (final row in rows) SearchHit(row.readTable(messages), row.readTable(chats)),
+        ]);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Photos and profile pictures
+  // ---------------------------------------------------------------------------
+
+  Future<MediaItem?> mediaOf(String messageId) =>
+      (select(media)..where((m) => m.messageId.equals(messageId))).getSingleOrNull();
+
+  Stream<Uint8List?> watchAvatar(String ownerId) => (select(avatars)..where((a) => a.ownerId.equals(ownerId)))
+      .watchSingleOrNull()
+      .map((row) => row?.bytes);
+
+  Future<Uint8List?> avatarOf(String ownerId) async =>
+      (await (select(avatars)..where((a) => a.ownerId.equals(ownerId))).getSingleOrNull())?.bytes;
+
+  Future<void> setAvatar(String ownerId, Uint8List bytes, int at) => into(avatars).insertOnConflictUpdate(
+        AvatarsCompanion.insert(ownerId: ownerId, bytes: bytes, updatedAt: at),
+      );
+
+  Future<void> removeAvatar(String ownerId) => (delete(avatars)..where((a) => a.ownerId.equals(ownerId))).go();
+
+  Future<void> deletePartsOfChat(String chatId) =>
+      (delete(mediaParts)..where((p) => p.chatId.equals(chatId))).go();
+
   // ---------------------------------------------------------------------------
   // Outbox
   // ---------------------------------------------------------------------------
 
   Future<List<OutboxEntry>> outboxInOrder({int limit = 200}) => (select(outbox)
-        ..orderBy([(o) => OrderingTerm.asc(o.createdAt)])
+        ..orderBy([
+          (o) => OrderingTerm.asc(o.createdAt),
+          (_) => OrderingTerm.asc(const CustomExpression<int>('rowid')),
+        ])
         ..limit(limit))
       .get();
+
+  Future<bool> hasOutboxFor(String messageId) async =>
+      (await (select(outbox)
+                ..where((o) => o.messageId.equals(messageId))
+                ..limit(1))
+              .get())
+          .isNotEmpty;
 
   Future<void> removeOutbox(String id) => (delete(outbox)..where((o) => o.id.equals(id))).go();
 

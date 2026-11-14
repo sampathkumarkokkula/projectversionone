@@ -22,9 +22,34 @@ class MyProfile {
   final int oneTimeKeyCount;
 }
 
-/// Thrown by [SupabaseBackend.createAccount] when the username is taken.
+/// The username is taken or reserved.
 class UsernameTakenException implements Exception {
   const UsernameTakenException();
+}
+
+/// The username was already changed in the last 24 hours.
+class UsernameChangeTooSoonException implements Exception {
+  const UsernameChangeTooSoonException();
+}
+
+/// The account was suspended after spam reports.
+class AccountSuspendedException implements Exception {
+  const AccountSuspendedException();
+}
+
+/// The e-mail address (or its domain) is on the server's blocklist.
+class EmailBlockedException implements Exception {
+  const EmailBlockedException();
+}
+
+/// A user on this account's server-side block list.
+class BlockedUser {
+  const BlockedUser({required this.userId, required this.username});
+
+  final String userId;
+
+  /// Null when that account no longer exists.
+  final String? username;
 }
 
 /// All server access: e-mail OTP auth, directory, keys, relay, realtime,
@@ -51,12 +76,21 @@ class SupabaseBackend implements RelayApi, DirectoryApi {
 
   String? get userId => _client.auth.currentUser?.id;
 
-  /// Runs an RPC, translating the "replaced phone" error.
+  /// Runs an RPC, translating BVM's own error codes.
   Future<dynamic> _rpc(String name, [Map<String, dynamic>? params]) async {
     try {
       return await _client.rpc<dynamic>(name, params: params);
     } on PostgrestException catch (e) {
-      if (e.code == _deviceReplacedCode) throw const DeviceReplacedException();
+      switch (e.code) {
+        case _deviceReplacedCode:
+          throw const DeviceReplacedException();
+        case 'BVM02':
+          throw const AccountSuspendedException();
+        case 'BVM03':
+          throw const EmailBlockedException();
+        case 'BVM04':
+          throw const UsernameChangeTooSoonException();
+      }
       rethrow;
     }
   }
@@ -127,6 +161,41 @@ class SupabaseBackend implements RelayApi, DirectoryApi {
 
   Future<void> setPushToken(String? token) async =>
       _rpc('set_push_token', {'p_device_key': await _deviceKey(), 'p_token': token});
+
+  /// Registers the random token the background task uses to ask whether new
+  /// messages are waiting (see BackgroundTasks).
+  Future<void> setInboxToken(String token) async =>
+      _rpc('set_inbox_token', {'p_device_key': await _deviceKey(), 'p_token': token});
+
+  /// Throws [UsernameTakenException] or [UsernameChangeTooSoonException].
+  Future<void> changeUsername(String username) async {
+    try {
+      await _rpc('change_username', {'p_device_key': await _deviceKey(), 'p_username': username});
+    } on PostgrestException catch (e) {
+      if (e.code == '23505') throw const UsernameTakenException();
+      rethrow;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Blocking and spam
+  // ---------------------------------------------------------------------------
+
+  /// Their envelopes are dropped by the server from now on (they are not told).
+  Future<void> blockUser(String userId) async =>
+      _rpc('block_user', {'p_device_key': await _deviceKey(), 'p_user': userId});
+
+  Future<void> unblockUser(String userId) async =>
+      _rpc('unblock_user', {'p_device_key': await _deviceKey(), 'p_user': userId});
+
+  /// Block + report. Accounts reported by several people are suspended.
+  Future<void> reportSpam(String userId) async =>
+      _rpc('report_spam', {'p_device_key': await _deviceKey(), 'p_user': userId});
+
+  Future<List<BlockedUser>> myBlocks() async => [
+        for (final row in _rows(await _rpc('my_blocks')))
+          BlockedUser(userId: row['user_id'] as String, username: row['username'] as String?),
+      ];
 
   /// Deletes the directory entry, keys, push token, encrypted phone number,
   /// pending envelopes addressed to this user and the auth user itself.

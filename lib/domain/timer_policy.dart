@@ -7,10 +7,10 @@ class TimerOption {
   final String label;
 }
 
+/// What the timer menu offers. Chats that still have a 1-hour or 5-hour timer
+/// from an earlier version keep it until either person changes it.
 const List<TimerOption> timerOptions = [
   TimerOption(null, 'Off'),
-  TimerOption(3600, '1 hour'),
-  TimerOption(5 * 3600, '5 hours'),
   TimerOption(24 * 3600, '1 day'),
   TimerOption(7 * 24 * 3600, '1 week'),
 ];
@@ -20,12 +20,16 @@ const int maxTimerSeconds = 7 * 24 * 3600;
 
 bool isOfferedTimer(int? seconds) => timerOptions.any((o) => o.seconds == seconds);
 
+/// Values accepted from a peer (also older app versions with 1 h / 5 h).
+bool isAcceptableTimer(int? seconds) => seconds == null || (seconds > 0 && seconds <= maxTimerSeconds);
+
 String timerLabel(int? seconds) {
   for (final option in timerOptions) {
     if (option.seconds == seconds) return option.label;
   }
   if (seconds == null) return 'Off';
   if (seconds % 86400 == 0) return '${seconds ~/ 86400} days';
+  if (seconds == 3600) return '1 hour';
   if (seconds % 3600 == 0) return '${seconds ~/ 3600} hours';
   return '${(seconds / 60).ceil()} minutes';
 }

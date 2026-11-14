@@ -8,6 +8,7 @@ import '../data/crypto/argon2_hasher.dart';
 import '../data/crypto/olm_crypto.dart';
 import '../data/local/app_database.dart';
 import '../data/local/device_key_store.dart';
+import '../data/push/notifications.dart';
 import '../data/push/push_service.dart';
 import '../data/remote/supabase_backend.dart';
 import '../domain/expiry_sweeper.dart';
@@ -18,6 +19,7 @@ import '../domain/session_establisher.dart';
 import '../domain/sync_engine.dart';
 import '../domain/wipe_service.dart';
 import 'account_service.dart';
+import 'chat_actions.dart';
 
 /// Composition root: every long-lived service, wired once at start-up.
 class AppServices {
@@ -34,7 +36,9 @@ class AppServices {
     required this.sweeper,
     required this.sync,
     required this.account,
+    required this.chatActions,
     required this.push,
+    required this.notifications,
     required this.clock,
   });
 
@@ -63,7 +67,15 @@ class AppServices {
       wipe: wipe,
       clock: clock,
     );
-    final account = AccountService(backend: backend, crypto: crypto, lock: lock, wipe: wipe, db: db);
+    final account = AccountService(
+      backend: backend,
+      crypto: crypto,
+      lock: lock,
+      wipe: wipe,
+      db: db,
+      keyStore: keyStore,
+      messages: messages,
+    );
     return AppServices._(
       keyStore: keyStore,
       db: db,
@@ -77,7 +89,9 @@ class AppServices {
       sweeper: sweeper,
       sync: sync,
       account: account,
+      chatActions: ChatActions(backend: backend, messages: messages),
       push: PushService(),
+      notifications: Notifications(),
       clock: clock,
     );
   }
@@ -94,6 +108,8 @@ class AppServices {
   final ExpirySweeper sweeper;
   final SyncEngine sync;
   final AccountService account;
+  final ChatActions chatActions;
   final PushService push;
+  final Notifications notifications;
   final Clock clock;
 }

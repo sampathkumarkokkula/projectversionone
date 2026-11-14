@@ -1,11 +1,18 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import '../core/ids.dart';
 import '../core/log.dart';
 import '../data/local/app_database.dart';
+import '../data/local/device_key_store.dart';
 import '../data/remote/supabase_backend.dart';
 import '../domain/lock_service.dart';
+import '../domain/message_service.dart';
 import '../domain/ports.dart';
 import '../domain/wipe_service.dart';
 
-/// Registration, new-device sign-in, password reset and key upkeep.
+/// Registration, new-device sign-in, password reset, profile (username and
+/// picture), and key upkeep.
 class AccountService {
   AccountService({
     required this.backend,
@@ -13,6 +20,8 @@ class AccountService {
     required this.lock,
     required this.wipe,
     required this.db,
+    required this.keyStore,
+    required this.messages,
   });
 
   final SupabaseBackend backend;
@@ -20,6 +29,8 @@ class AccountService {
   final LockService lock;
   final WipeService wipe;
   final AppDatabase db;
+  final DeviceKeyStore keyStore;
+  final MessageService messages;
 
   static const _selfId = 'self.id';
   static const _selfUsername = 'self.username';
@@ -187,8 +198,49 @@ class AccountService {
   }
 
   // ---------------------------------------------------------------------------
+  // Profile
+  // ---------------------------------------------------------------------------
+
+  /// Changes the public username (at most once every 24 hours). People you
+  /// chat with see the new name on their next sync.
+  Future<void> changeUsername(String username) async {
+    final name = normalizeUsername(username);
+    if (!usernamePattern.hasMatch(name)) throw ArgumentError('invalid username');
+    if (name == await this.username()) return;
+    await backend.changeUsername(name);
+    await db.write(_selfUsername, name);
+    await messages.bumpProfileVersion();
+  }
+
+  /// Sets the profile picture (a small JPEG from ImageProcessor). It is sent,
+  /// end-to-end encrypted, only to accepted chats; the server never stores it.
+  Future<void> setAvatar(Uint8List jpeg) async {
+    await db.setAvatar(selfAvatarId, jpeg, DateTime.now().millisecondsSinceEpoch);
+    await messages.bumpProfileVersion();
+  }
+
+  Future<void> removeAvatar() async {
+    await db.removeAvatar(selfAvatarId);
+    await messages.bumpProfileVersion();
+  }
+
+  // ---------------------------------------------------------------------------
   // Upkeep
   // ---------------------------------------------------------------------------
+
+  /// Registers a random token so the background task can ask the server
+  /// whether new messages wait (notifications without Firebase). Done once
+  /// per phone and account.
+  Future<void> ensureInboxToken() async {
+    final uid = backend.userId;
+    if (uid == null) return;
+    final deviceKey = await crypto.identityKey();
+    final existing = await keyStore.inboxCredentials();
+    if (existing != null && existing.userId == uid && existing.deviceKey == deviceKey) return;
+    final token = base64Url.encode(secureRandomBytes(32)).replaceAll('=', '');
+    await backend.setInboxToken(token);
+    await keyStore.saveInboxCredentials(InboxCredentials(userId: uid, token: token, deviceKey: deviceKey));
+  }
 
   /// Keeps enough signed one-time keys on the server for new contacts.
   /// Throws [DeviceReplacedException] when another phone owns the account.

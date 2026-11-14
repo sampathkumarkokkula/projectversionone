@@ -34,6 +34,10 @@ class AppRuntime {
   Future<void> start() async {
     if (_started) return;
     _started = true;
+    // New messages while the app is in the background: generic notification.
+    _s.sync.onNewMessages = (count) {
+      if (!_foreground) unawaited(_s.notifications.show(count));
+    };
     _sweepTimer = Timer.periodic(const Duration(seconds: 5), (_) => unawaited(_sweep()));
     try {
       await scheduleBackgroundSweep();
@@ -56,8 +60,11 @@ class AppRuntime {
     await syncNow();
     try {
       await _s.account.maintainKeys();
+      await _s.account.ensureInboxToken();
     } on DeviceReplacedException {
       await _enterReplacedMode();
+    } on Object {
+      logDebug('inbox token: registration failed');
     }
     if (_replaced) return;
     await _s.push.start(
@@ -126,7 +133,7 @@ class AppRuntime {
 
   void onForeground() {
     _foreground = true;
-    unawaited(_s.push.clearNotifications());
+    unawaited(_s.notifications.clear());
     unawaited(_sweep());
     unawaited(syncNow());
   }

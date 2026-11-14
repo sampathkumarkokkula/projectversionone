@@ -51,7 +51,9 @@ class WipeService {
         final now = clock.nowMs();
         final chats = await db.timerChats();
         for (final chat in chats) {
+          // Photos are deleted with their messages; half-received ones too.
           await db.deleteAllMessagesOf(chat.peerId);
+          await db.deletePartsOfChat(chat.peerId);
           await (db.delete(db.pendingDeletes)..where((p) => p.chatId.equals(chat.peerId))).go();
           // Unsent messages of this chat must not leave the device any more.
           await db.dropOutboxFor(chat.peerId, const ['message', 'delete']);

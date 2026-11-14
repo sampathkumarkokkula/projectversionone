@@ -47,12 +47,55 @@ sealed class Payload {
           final at = map['at'];
           final ttl = map['ttl'];
           if (id is! String || body is! String || at is! int) return const UnknownPayload();
+          final reply = map['r'];
           return TextPayload(
             id: id,
             body: body,
             sentAt: at,
             ttlSeconds: ttl is int && ttl > 0 ? ttl : null,
+            replyTo: reply is String ? reply : null,
           );
+        case 'img':
+          final id = map['id'];
+          final part = map['i'];
+          final total = map['n'];
+          final at = map['at'];
+          final ttl = map['ttl'];
+          final width = map['w'];
+          final height = map['h'];
+          final sha = map['sha'];
+          final data = map['d'];
+          final reply = map['r'];
+          if (id is! String ||
+              part is! int ||
+              total is! int ||
+              at is! int ||
+              width is! int ||
+              height is! int ||
+              sha is! String ||
+              data is! String) {
+            return const UnknownPayload();
+          }
+          if (total < 1 || total > ImagePartPayload.maxParts || part < 0 || part >= total) {
+            return const UnknownPayload();
+          }
+          return ImagePartPayload(
+            id: id,
+            part: part,
+            total: total,
+            sentAt: at,
+            ttlSeconds: ttl is int && ttl > 0 ? ttl : null,
+            width: width,
+            height: height,
+            sha256: sha,
+            data: data,
+            replyTo: reply is String ? reply : null,
+          );
+        case 'profile':
+          final version = map['pv'];
+          final avatar = map['a'];
+          if (version is! int || (avatar != null && avatar is! String)) return const UnknownPayload();
+          return ProfilePayload(version: version, avatarBase64: avatar as String?);
         case 'receipt':
           final ids = _stringList(map['ids']);
           final st = map['st'];
@@ -91,19 +134,23 @@ sealed class Payload {
 }
 
 /// A chat message. [ttlSeconds] is the sender's auto-delete timer at the
-/// moment of sending (`null` = never expires).
+/// moment of sending (`null` = never expires). [replyTo] is the id of the
+/// message being answered; the quoted text itself is never re-sent, so a
+/// reply cannot keep an expired message alive.
 final class TextPayload extends Payload {
   const TextPayload({
     required this.id,
     required this.body,
     required this.sentAt,
     this.ttlSeconds,
+    this.replyTo,
   });
 
   final String id;
   final String body;
   final int sentAt;
   final int? ttlSeconds;
+  final String? replyTo;
 
   @override
   String get relayType => 'message';
@@ -115,7 +162,93 @@ final class TextPayload extends Payload {
   String get _kind => 'text';
 
   @override
-  Map<String, Object?> _fields() => {'id': id, 'b': body, 'at': sentAt, 'ttl': ttlSeconds};
+  Map<String, Object?> _fields() => {'id': id, 'b': body, 'at': sentAt, 'ttl': ttlSeconds, 'r': replyTo};
+}
+
+/// One part of a photo. A photo (already shrunk to at most ~300 KB JPEG) is
+/// split into parts of [partBytes] so every part fits a normal relay envelope;
+/// each part is Olm-encrypted like a text message and deleted from the server
+/// once delivered. [sha256] covers the whole JPEG and is checked after the
+/// parts are joined.
+final class ImagePartPayload extends Payload {
+  const ImagePartPayload({
+    required this.id,
+    required this.part,
+    required this.total,
+    required this.sentAt,
+    required this.width,
+    required this.height,
+    required this.sha256,
+    required this.data,
+    this.ttlSeconds,
+    this.replyTo,
+  });
+
+  /// Raw bytes per part. Keeps the double-base64 envelope under the relay's
+  /// 64 KiB limit.
+  static const int partBytes = 30 * 1024;
+  static const int maxParts = 20;
+
+  final String id;
+  final int part;
+  final int total;
+  final int sentAt;
+  final int width;
+  final int height;
+  final String sha256;
+
+  /// Base64 of this part's bytes.
+  final String data;
+  final int? ttlSeconds;
+  final String? replyTo;
+
+  @override
+  String get relayType => 'message';
+
+  /// One wake-up per photo, not per part.
+  @override
+  bool get wantsPush => part == 0;
+
+  @override
+  String get _kind => 'img';
+
+  @override
+  Map<String, Object?> _fields() => {
+        'id': id,
+        'i': part,
+        'n': total,
+        'at': sentAt,
+        'ttl': ttlSeconds,
+        'w': width,
+        'h': height,
+        'sha': sha256,
+        'd': data,
+        'r': replyTo,
+      };
+}
+
+/// The sender's profile picture (or its removal), sent only to people they
+/// chat with. Also tells the receiver to re-read the sender's username from
+/// the directory, so a changed username shows up without being trusted from
+/// the message itself.
+final class ProfilePayload extends Payload {
+  const ProfilePayload({required this.version, this.avatarBase64});
+
+  final int version;
+
+  /// Base64 JPEG (at most ~24 KB), or null when the picture was removed.
+  final String? avatarBase64;
+
+  /// Travels as type `receipt`, so the server cannot tell profile updates
+  /// apart from read receipts.
+  @override
+  String get relayType => 'receipt';
+
+  @override
+  String get _kind => 'profile';
+
+  @override
+  Map<String, Object?> _fields() => {'pv': version, 'a': avatarBase64};
 }
 
 /// Delivery or read receipt for messages the recipient sent.

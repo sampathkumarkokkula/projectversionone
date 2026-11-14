@@ -106,6 +106,73 @@ class $ChatsTable extends Chats with TableInfo<$ChatsTable, Chat> {
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _blockedMeta = const VerificationMeta(
+    'blocked',
+  );
+  @override
+  late final GeneratedColumn<bool> blocked = GeneratedColumn<bool>(
+    'blocked',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("blocked" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _acceptedMeta = const VerificationMeta(
+    'accepted',
+  );
+  @override
+  late final GeneratedColumn<bool> accepted = GeneratedColumn<bool>(
+    'accepted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("accepted" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _profileSentVersionMeta =
+      const VerificationMeta('profileSentVersion');
+  @override
+  late final GeneratedColumn<int> profileSentVersion = GeneratedColumn<int>(
+    'profile_sent_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _refreshProfileMeta = const VerificationMeta(
+    'refreshProfile',
+  );
+  @override
+  late final GeneratedColumn<bool> refreshProfile = GeneratedColumn<bool>(
+    'refresh_profile',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("refresh_profile" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _directoryCheckedAtMeta =
+      const VerificationMeta('directoryCheckedAt');
+  @override
+  late final GeneratedColumn<int> directoryCheckedAt = GeneratedColumn<int>(
+    'directory_checked_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     peerId,
@@ -117,6 +184,11 @@ class $ChatsTable extends Chats with TableInfo<$ChatsTable, Chat> {
     wipedBefore,
     createdAt,
     lastActivityAt,
+    blocked,
+    accepted,
+    profileSentVersion,
+    refreshProfile,
+    directoryCheckedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -217,6 +289,45 @@ class $ChatsTable extends Chats with TableInfo<$ChatsTable, Chat> {
     } else if (isInserting) {
       context.missing(_lastActivityAtMeta);
     }
+    if (data.containsKey('blocked')) {
+      context.handle(
+        _blockedMeta,
+        blocked.isAcceptableOrUnknown(data['blocked']!, _blockedMeta),
+      );
+    }
+    if (data.containsKey('accepted')) {
+      context.handle(
+        _acceptedMeta,
+        accepted.isAcceptableOrUnknown(data['accepted']!, _acceptedMeta),
+      );
+    }
+    if (data.containsKey('profile_sent_version')) {
+      context.handle(
+        _profileSentVersionMeta,
+        profileSentVersion.isAcceptableOrUnknown(
+          data['profile_sent_version']!,
+          _profileSentVersionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('refresh_profile')) {
+      context.handle(
+        _refreshProfileMeta,
+        refreshProfile.isAcceptableOrUnknown(
+          data['refresh_profile']!,
+          _refreshProfileMeta,
+        ),
+      );
+    }
+    if (data.containsKey('directory_checked_at')) {
+      context.handle(
+        _directoryCheckedAtMeta,
+        directoryCheckedAt.isAcceptableOrUnknown(
+          data['directory_checked_at']!,
+          _directoryCheckedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -262,6 +373,26 @@ class $ChatsTable extends Chats with TableInfo<$ChatsTable, Chat> {
         DriftSqlType.int,
         data['${effectivePrefix}last_activity_at'],
       )!,
+      blocked: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}blocked'],
+      )!,
+      accepted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}accepted'],
+      )!,
+      profileSentVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}profile_sent_version'],
+      )!,
+      refreshProfile: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}refresh_profile'],
+      )!,
+      directoryCheckedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}directory_checked_at'],
+      )!,
     );
   }
 
@@ -288,6 +419,23 @@ class Chat extends DataClass implements Insertable<Chat> {
   final int? wipedBefore;
   final int createdAt;
   final int lastActivityAt;
+
+  /// Blocked by this user (also enforced on the server).
+  final bool blocked;
+
+  /// False for a chat someone else started ("message request") until this
+  /// user accepts or replies. No receipts and no profile picture go to a
+  /// request.
+  final bool accepted;
+
+  /// Own profile version last sent to this peer.
+  final int profileSentVersion;
+
+  /// The peer announced a profile change; re-read their username.
+  final bool refreshProfile;
+
+  /// Last time the peer's username was checked against the directory.
+  final int directoryCheckedAt;
   const Chat({
     required this.peerId,
     required this.peerUsername,
@@ -298,6 +446,11 @@ class Chat extends DataClass implements Insertable<Chat> {
     this.wipedBefore,
     required this.createdAt,
     required this.lastActivityAt,
+    required this.blocked,
+    required this.accepted,
+    required this.profileSentVersion,
+    required this.refreshProfile,
+    required this.directoryCheckedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -315,6 +468,11 @@ class Chat extends DataClass implements Insertable<Chat> {
     }
     map['created_at'] = Variable<int>(createdAt);
     map['last_activity_at'] = Variable<int>(lastActivityAt);
+    map['blocked'] = Variable<bool>(blocked);
+    map['accepted'] = Variable<bool>(accepted);
+    map['profile_sent_version'] = Variable<int>(profileSentVersion);
+    map['refresh_profile'] = Variable<bool>(refreshProfile);
+    map['directory_checked_at'] = Variable<int>(directoryCheckedAt);
     return map;
   }
 
@@ -333,6 +491,11 @@ class Chat extends DataClass implements Insertable<Chat> {
           : Value(wipedBefore),
       createdAt: Value(createdAt),
       lastActivityAt: Value(lastActivityAt),
+      blocked: Value(blocked),
+      accepted: Value(accepted),
+      profileSentVersion: Value(profileSentVersion),
+      refreshProfile: Value(refreshProfile),
+      directoryCheckedAt: Value(directoryCheckedAt),
     );
   }
 
@@ -351,6 +514,11 @@ class Chat extends DataClass implements Insertable<Chat> {
       wipedBefore: serializer.fromJson<int?>(json['wipedBefore']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
       lastActivityAt: serializer.fromJson<int>(json['lastActivityAt']),
+      blocked: serializer.fromJson<bool>(json['blocked']),
+      accepted: serializer.fromJson<bool>(json['accepted']),
+      profileSentVersion: serializer.fromJson<int>(json['profileSentVersion']),
+      refreshProfile: serializer.fromJson<bool>(json['refreshProfile']),
+      directoryCheckedAt: serializer.fromJson<int>(json['directoryCheckedAt']),
     );
   }
   @override
@@ -366,6 +534,11 @@ class Chat extends DataClass implements Insertable<Chat> {
       'wipedBefore': serializer.toJson<int?>(wipedBefore),
       'createdAt': serializer.toJson<int>(createdAt),
       'lastActivityAt': serializer.toJson<int>(lastActivityAt),
+      'blocked': serializer.toJson<bool>(blocked),
+      'accepted': serializer.toJson<bool>(accepted),
+      'profileSentVersion': serializer.toJson<int>(profileSentVersion),
+      'refreshProfile': serializer.toJson<bool>(refreshProfile),
+      'directoryCheckedAt': serializer.toJson<int>(directoryCheckedAt),
     };
   }
 
@@ -379,6 +552,11 @@ class Chat extends DataClass implements Insertable<Chat> {
     Value<int?> wipedBefore = const Value.absent(),
     int? createdAt,
     int? lastActivityAt,
+    bool? blocked,
+    bool? accepted,
+    int? profileSentVersion,
+    bool? refreshProfile,
+    int? directoryCheckedAt,
   }) => Chat(
     peerId: peerId ?? this.peerId,
     peerUsername: peerUsername ?? this.peerUsername,
@@ -389,6 +567,11 @@ class Chat extends DataClass implements Insertable<Chat> {
     wipedBefore: wipedBefore.present ? wipedBefore.value : this.wipedBefore,
     createdAt: createdAt ?? this.createdAt,
     lastActivityAt: lastActivityAt ?? this.lastActivityAt,
+    blocked: blocked ?? this.blocked,
+    accepted: accepted ?? this.accepted,
+    profileSentVersion: profileSentVersion ?? this.profileSentVersion,
+    refreshProfile: refreshProfile ?? this.refreshProfile,
+    directoryCheckedAt: directoryCheckedAt ?? this.directoryCheckedAt,
   );
   Chat copyWithCompanion(ChatsCompanion data) {
     return Chat(
@@ -415,6 +598,17 @@ class Chat extends DataClass implements Insertable<Chat> {
       lastActivityAt: data.lastActivityAt.present
           ? data.lastActivityAt.value
           : this.lastActivityAt,
+      blocked: data.blocked.present ? data.blocked.value : this.blocked,
+      accepted: data.accepted.present ? data.accepted.value : this.accepted,
+      profileSentVersion: data.profileSentVersion.present
+          ? data.profileSentVersion.value
+          : this.profileSentVersion,
+      refreshProfile: data.refreshProfile.present
+          ? data.refreshProfile.value
+          : this.refreshProfile,
+      directoryCheckedAt: data.directoryCheckedAt.present
+          ? data.directoryCheckedAt.value
+          : this.directoryCheckedAt,
     );
   }
 
@@ -429,7 +623,12 @@ class Chat extends DataClass implements Insertable<Chat> {
           ..write('timerChangedAt: $timerChangedAt, ')
           ..write('wipedBefore: $wipedBefore, ')
           ..write('createdAt: $createdAt, ')
-          ..write('lastActivityAt: $lastActivityAt')
+          ..write('lastActivityAt: $lastActivityAt, ')
+          ..write('blocked: $blocked, ')
+          ..write('accepted: $accepted, ')
+          ..write('profileSentVersion: $profileSentVersion, ')
+          ..write('refreshProfile: $refreshProfile, ')
+          ..write('directoryCheckedAt: $directoryCheckedAt')
           ..write(')'))
         .toString();
   }
@@ -445,6 +644,11 @@ class Chat extends DataClass implements Insertable<Chat> {
     wipedBefore,
     createdAt,
     lastActivityAt,
+    blocked,
+    accepted,
+    profileSentVersion,
+    refreshProfile,
+    directoryCheckedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -458,7 +662,12 @@ class Chat extends DataClass implements Insertable<Chat> {
           other.timerChangedAt == this.timerChangedAt &&
           other.wipedBefore == this.wipedBefore &&
           other.createdAt == this.createdAt &&
-          other.lastActivityAt == this.lastActivityAt);
+          other.lastActivityAt == this.lastActivityAt &&
+          other.blocked == this.blocked &&
+          other.accepted == this.accepted &&
+          other.profileSentVersion == this.profileSentVersion &&
+          other.refreshProfile == this.refreshProfile &&
+          other.directoryCheckedAt == this.directoryCheckedAt);
 }
 
 class ChatsCompanion extends UpdateCompanion<Chat> {
@@ -471,6 +680,11 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
   final Value<int?> wipedBefore;
   final Value<int> createdAt;
   final Value<int> lastActivityAt;
+  final Value<bool> blocked;
+  final Value<bool> accepted;
+  final Value<int> profileSentVersion;
+  final Value<bool> refreshProfile;
+  final Value<int> directoryCheckedAt;
   final Value<int> rowid;
   const ChatsCompanion({
     this.peerId = const Value.absent(),
@@ -482,6 +696,11 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
     this.wipedBefore = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.lastActivityAt = const Value.absent(),
+    this.blocked = const Value.absent(),
+    this.accepted = const Value.absent(),
+    this.profileSentVersion = const Value.absent(),
+    this.refreshProfile = const Value.absent(),
+    this.directoryCheckedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ChatsCompanion.insert({
@@ -494,6 +713,11 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
     this.wipedBefore = const Value.absent(),
     required int createdAt,
     required int lastActivityAt,
+    this.blocked = const Value.absent(),
+    this.accepted = const Value.absent(),
+    this.profileSentVersion = const Value.absent(),
+    this.refreshProfile = const Value.absent(),
+    this.directoryCheckedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : peerId = Value(peerId),
        peerUsername = Value(peerUsername),
@@ -511,6 +735,11 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
     Expression<int>? wipedBefore,
     Expression<int>? createdAt,
     Expression<int>? lastActivityAt,
+    Expression<bool>? blocked,
+    Expression<bool>? accepted,
+    Expression<int>? profileSentVersion,
+    Expression<bool>? refreshProfile,
+    Expression<int>? directoryCheckedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -523,6 +752,13 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
       if (wipedBefore != null) 'wiped_before': wipedBefore,
       if (createdAt != null) 'created_at': createdAt,
       if (lastActivityAt != null) 'last_activity_at': lastActivityAt,
+      if (blocked != null) 'blocked': blocked,
+      if (accepted != null) 'accepted': accepted,
+      if (profileSentVersion != null)
+        'profile_sent_version': profileSentVersion,
+      if (refreshProfile != null) 'refresh_profile': refreshProfile,
+      if (directoryCheckedAt != null)
+        'directory_checked_at': directoryCheckedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -537,6 +773,11 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
     Value<int?>? wipedBefore,
     Value<int>? createdAt,
     Value<int>? lastActivityAt,
+    Value<bool>? blocked,
+    Value<bool>? accepted,
+    Value<int>? profileSentVersion,
+    Value<bool>? refreshProfile,
+    Value<int>? directoryCheckedAt,
     Value<int>? rowid,
   }) {
     return ChatsCompanion(
@@ -549,6 +790,11 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
       wipedBefore: wipedBefore ?? this.wipedBefore,
       createdAt: createdAt ?? this.createdAt,
       lastActivityAt: lastActivityAt ?? this.lastActivityAt,
+      blocked: blocked ?? this.blocked,
+      accepted: accepted ?? this.accepted,
+      profileSentVersion: profileSentVersion ?? this.profileSentVersion,
+      refreshProfile: refreshProfile ?? this.refreshProfile,
+      directoryCheckedAt: directoryCheckedAt ?? this.directoryCheckedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -583,6 +829,21 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
     if (lastActivityAt.present) {
       map['last_activity_at'] = Variable<int>(lastActivityAt.value);
     }
+    if (blocked.present) {
+      map['blocked'] = Variable<bool>(blocked.value);
+    }
+    if (accepted.present) {
+      map['accepted'] = Variable<bool>(accepted.value);
+    }
+    if (profileSentVersion.present) {
+      map['profile_sent_version'] = Variable<int>(profileSentVersion.value);
+    }
+    if (refreshProfile.present) {
+      map['refresh_profile'] = Variable<bool>(refreshProfile.value);
+    }
+    if (directoryCheckedAt.present) {
+      map['directory_checked_at'] = Variable<int>(directoryCheckedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -601,6 +862,11 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
           ..write('wipedBefore: $wipedBefore, ')
           ..write('createdAt: $createdAt, ')
           ..write('lastActivityAt: $lastActivityAt, ')
+          ..write('blocked: $blocked, ')
+          ..write('accepted: $accepted, ')
+          ..write('profileSentVersion: $profileSentVersion, ')
+          ..write('refreshProfile: $refreshProfile, ')
+          ..write('directoryCheckedAt: $directoryCheckedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -703,6 +969,17 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _replyToMeta = const VerificationMeta(
+    'replyTo',
+  );
+  @override
+  late final GeneratedColumn<String> replyTo = GeneratedColumn<String>(
+    'reply_to',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -714,6 +991,7 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
     localAt,
     expiresAt,
     status,
+    replyTo,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -794,6 +1072,12 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
     } else if (isInserting) {
       context.missing(_statusMeta);
     }
+    if (data.containsKey('reply_to')) {
+      context.handle(
+        _replyToMeta,
+        replyTo.isAcceptableOrUnknown(data['reply_to']!, _replyToMeta),
+      );
+    }
     return context;
   }
 
@@ -839,6 +1123,10 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
         DriftSqlType.string,
         data['${effectivePrefix}status'],
       )!,
+      replyTo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reply_to'],
+      ),
     );
   }
 
@@ -868,6 +1156,9 @@ class Message extends DataClass implements Insertable<Message> {
 
   /// [MessageStatus] name.
   final String status;
+
+  /// Id of the message this one replies to (schema v2).
+  final String? replyTo;
   const Message({
     required this.id,
     required this.chatId,
@@ -878,6 +1169,7 @@ class Message extends DataClass implements Insertable<Message> {
     required this.localAt,
     this.expiresAt,
     required this.status,
+    this.replyTo,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -893,6 +1185,9 @@ class Message extends DataClass implements Insertable<Message> {
       map['expires_at'] = Variable<int>(expiresAt);
     }
     map['status'] = Variable<String>(status);
+    if (!nullToAbsent || replyTo != null) {
+      map['reply_to'] = Variable<String>(replyTo);
+    }
     return map;
   }
 
@@ -909,6 +1204,9 @@ class Message extends DataClass implements Insertable<Message> {
           ? const Value.absent()
           : Value(expiresAt),
       status: Value(status),
+      replyTo: replyTo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(replyTo),
     );
   }
 
@@ -927,6 +1225,7 @@ class Message extends DataClass implements Insertable<Message> {
       localAt: serializer.fromJson<int>(json['localAt']),
       expiresAt: serializer.fromJson<int?>(json['expiresAt']),
       status: serializer.fromJson<String>(json['status']),
+      replyTo: serializer.fromJson<String?>(json['replyTo']),
     );
   }
   @override
@@ -942,6 +1241,7 @@ class Message extends DataClass implements Insertable<Message> {
       'localAt': serializer.toJson<int>(localAt),
       'expiresAt': serializer.toJson<int?>(expiresAt),
       'status': serializer.toJson<String>(status),
+      'replyTo': serializer.toJson<String?>(replyTo),
     };
   }
 
@@ -955,6 +1255,7 @@ class Message extends DataClass implements Insertable<Message> {
     int? localAt,
     Value<int?> expiresAt = const Value.absent(),
     String? status,
+    Value<String?> replyTo = const Value.absent(),
   }) => Message(
     id: id ?? this.id,
     chatId: chatId ?? this.chatId,
@@ -965,6 +1266,7 @@ class Message extends DataClass implements Insertable<Message> {
     localAt: localAt ?? this.localAt,
     expiresAt: expiresAt.present ? expiresAt.value : this.expiresAt,
     status: status ?? this.status,
+    replyTo: replyTo.present ? replyTo.value : this.replyTo,
   );
   Message copyWithCompanion(MessagesCompanion data) {
     return Message(
@@ -977,6 +1279,7 @@ class Message extends DataClass implements Insertable<Message> {
       localAt: data.localAt.present ? data.localAt.value : this.localAt,
       expiresAt: data.expiresAt.present ? data.expiresAt.value : this.expiresAt,
       status: data.status.present ? data.status.value : this.status,
+      replyTo: data.replyTo.present ? data.replyTo.value : this.replyTo,
     );
   }
 
@@ -991,7 +1294,8 @@ class Message extends DataClass implements Insertable<Message> {
           ..write('sentAt: $sentAt, ')
           ..write('localAt: $localAt, ')
           ..write('expiresAt: $expiresAt, ')
-          ..write('status: $status')
+          ..write('status: $status, ')
+          ..write('replyTo: $replyTo')
           ..write(')'))
         .toString();
   }
@@ -1007,6 +1311,7 @@ class Message extends DataClass implements Insertable<Message> {
     localAt,
     expiresAt,
     status,
+    replyTo,
   );
   @override
   bool operator ==(Object other) =>
@@ -1020,7 +1325,8 @@ class Message extends DataClass implements Insertable<Message> {
           other.sentAt == this.sentAt &&
           other.localAt == this.localAt &&
           other.expiresAt == this.expiresAt &&
-          other.status == this.status);
+          other.status == this.status &&
+          other.replyTo == this.replyTo);
 }
 
 class MessagesCompanion extends UpdateCompanion<Message> {
@@ -1033,6 +1339,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
   final Value<int> localAt;
   final Value<int?> expiresAt;
   final Value<String> status;
+  final Value<String?> replyTo;
   final Value<int> rowid;
   const MessagesCompanion({
     this.id = const Value.absent(),
@@ -1044,6 +1351,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     this.localAt = const Value.absent(),
     this.expiresAt = const Value.absent(),
     this.status = const Value.absent(),
+    this.replyTo = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   MessagesCompanion.insert({
@@ -1056,6 +1364,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     required int localAt,
     this.expiresAt = const Value.absent(),
     required String status,
+    this.replyTo = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        chatId = Value(chatId),
@@ -1075,6 +1384,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     Expression<int>? localAt,
     Expression<int>? expiresAt,
     Expression<String>? status,
+    Expression<String>? replyTo,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1087,6 +1397,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       if (localAt != null) 'local_at': localAt,
       if (expiresAt != null) 'expires_at': expiresAt,
       if (status != null) 'status': status,
+      if (replyTo != null) 'reply_to': replyTo,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1101,6 +1412,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     Value<int>? localAt,
     Value<int?>? expiresAt,
     Value<String>? status,
+    Value<String?>? replyTo,
     Value<int>? rowid,
   }) {
     return MessagesCompanion(
@@ -1113,6 +1425,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       localAt: localAt ?? this.localAt,
       expiresAt: expiresAt ?? this.expiresAt,
       status: status ?? this.status,
+      replyTo: replyTo ?? this.replyTo,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1147,6 +1460,9 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     if (status.present) {
       map['status'] = Variable<String>(status.value);
     }
+    if (replyTo.present) {
+      map['reply_to'] = Variable<String>(replyTo.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1165,6 +1481,1280 @@ class MessagesCompanion extends UpdateCompanion<Message> {
           ..write('localAt: $localAt, ')
           ..write('expiresAt: $expiresAt, ')
           ..write('status: $status, ')
+          ..write('replyTo: $replyTo, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $MediaTable extends Media with TableInfo<$MediaTable, MediaItem> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MediaTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _messageIdMeta = const VerificationMeta(
+    'messageId',
+  );
+  @override
+  late final GeneratedColumn<String> messageId = GeneratedColumn<String>(
+    'message_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES messages (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _bytesMeta = const VerificationMeta('bytes');
+  @override
+  late final GeneratedColumn<Uint8List> bytes = GeneratedColumn<Uint8List>(
+    'bytes',
+    aliasedName,
+    false,
+    type: DriftSqlType.blob,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _widthMeta = const VerificationMeta('width');
+  @override
+  late final GeneratedColumn<int> width = GeneratedColumn<int>(
+    'width',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _heightMeta = const VerificationMeta('height');
+  @override
+  late final GeneratedColumn<int> height = GeneratedColumn<int>(
+    'height',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [messageId, bytes, width, height];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'media';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MediaItem> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('message_id')) {
+      context.handle(
+        _messageIdMeta,
+        messageId.isAcceptableOrUnknown(data['message_id']!, _messageIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_messageIdMeta);
+    }
+    if (data.containsKey('bytes')) {
+      context.handle(
+        _bytesMeta,
+        bytes.isAcceptableOrUnknown(data['bytes']!, _bytesMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_bytesMeta);
+    }
+    if (data.containsKey('width')) {
+      context.handle(
+        _widthMeta,
+        width.isAcceptableOrUnknown(data['width']!, _widthMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_widthMeta);
+    }
+    if (data.containsKey('height')) {
+      context.handle(
+        _heightMeta,
+        height.isAcceptableOrUnknown(data['height']!, _heightMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_heightMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {messageId};
+  @override
+  MediaItem map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MediaItem(
+      messageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}message_id'],
+      )!,
+      bytes: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}bytes'],
+      )!,
+      width: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}width'],
+      )!,
+      height: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}height'],
+      )!,
+    );
+  }
+
+  @override
+  $MediaTable createAlias(String alias) {
+    return $MediaTable(attachedDatabase, alias);
+  }
+}
+
+class MediaItem extends DataClass implements Insertable<MediaItem> {
+  final String messageId;
+  final Uint8List bytes;
+  final int width;
+  final int height;
+  const MediaItem({
+    required this.messageId,
+    required this.bytes,
+    required this.width,
+    required this.height,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['message_id'] = Variable<String>(messageId);
+    map['bytes'] = Variable<Uint8List>(bytes);
+    map['width'] = Variable<int>(width);
+    map['height'] = Variable<int>(height);
+    return map;
+  }
+
+  MediaCompanion toCompanion(bool nullToAbsent) {
+    return MediaCompanion(
+      messageId: Value(messageId),
+      bytes: Value(bytes),
+      width: Value(width),
+      height: Value(height),
+    );
+  }
+
+  factory MediaItem.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MediaItem(
+      messageId: serializer.fromJson<String>(json['messageId']),
+      bytes: serializer.fromJson<Uint8List>(json['bytes']),
+      width: serializer.fromJson<int>(json['width']),
+      height: serializer.fromJson<int>(json['height']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'messageId': serializer.toJson<String>(messageId),
+      'bytes': serializer.toJson<Uint8List>(bytes),
+      'width': serializer.toJson<int>(width),
+      'height': serializer.toJson<int>(height),
+    };
+  }
+
+  MediaItem copyWith({
+    String? messageId,
+    Uint8List? bytes,
+    int? width,
+    int? height,
+  }) => MediaItem(
+    messageId: messageId ?? this.messageId,
+    bytes: bytes ?? this.bytes,
+    width: width ?? this.width,
+    height: height ?? this.height,
+  );
+  MediaItem copyWithCompanion(MediaCompanion data) {
+    return MediaItem(
+      messageId: data.messageId.present ? data.messageId.value : this.messageId,
+      bytes: data.bytes.present ? data.bytes.value : this.bytes,
+      width: data.width.present ? data.width.value : this.width,
+      height: data.height.present ? data.height.value : this.height,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MediaItem(')
+          ..write('messageId: $messageId, ')
+          ..write('bytes: $bytes, ')
+          ..write('width: $width, ')
+          ..write('height: $height')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(messageId, $driftBlobEquality.hash(bytes), width, height);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MediaItem &&
+          other.messageId == this.messageId &&
+          $driftBlobEquality.equals(other.bytes, this.bytes) &&
+          other.width == this.width &&
+          other.height == this.height);
+}
+
+class MediaCompanion extends UpdateCompanion<MediaItem> {
+  final Value<String> messageId;
+  final Value<Uint8List> bytes;
+  final Value<int> width;
+  final Value<int> height;
+  final Value<int> rowid;
+  const MediaCompanion({
+    this.messageId = const Value.absent(),
+    this.bytes = const Value.absent(),
+    this.width = const Value.absent(),
+    this.height = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  MediaCompanion.insert({
+    required String messageId,
+    required Uint8List bytes,
+    required int width,
+    required int height,
+    this.rowid = const Value.absent(),
+  }) : messageId = Value(messageId),
+       bytes = Value(bytes),
+       width = Value(width),
+       height = Value(height);
+  static Insertable<MediaItem> custom({
+    Expression<String>? messageId,
+    Expression<Uint8List>? bytes,
+    Expression<int>? width,
+    Expression<int>? height,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (messageId != null) 'message_id': messageId,
+      if (bytes != null) 'bytes': bytes,
+      if (width != null) 'width': width,
+      if (height != null) 'height': height,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  MediaCompanion copyWith({
+    Value<String>? messageId,
+    Value<Uint8List>? bytes,
+    Value<int>? width,
+    Value<int>? height,
+    Value<int>? rowid,
+  }) {
+    return MediaCompanion(
+      messageId: messageId ?? this.messageId,
+      bytes: bytes ?? this.bytes,
+      width: width ?? this.width,
+      height: height ?? this.height,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (messageId.present) {
+      map['message_id'] = Variable<String>(messageId.value);
+    }
+    if (bytes.present) {
+      map['bytes'] = Variable<Uint8List>(bytes.value);
+    }
+    if (width.present) {
+      map['width'] = Variable<int>(width.value);
+    }
+    if (height.present) {
+      map['height'] = Variable<int>(height.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MediaCompanion(')
+          ..write('messageId: $messageId, ')
+          ..write('bytes: $bytes, ')
+          ..write('width: $width, ')
+          ..write('height: $height, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $MediaPartsTable extends MediaParts
+    with TableInfo<$MediaPartsTable, MediaPart> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MediaPartsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _messageIdMeta = const VerificationMeta(
+    'messageId',
+  );
+  @override
+  late final GeneratedColumn<String> messageId = GeneratedColumn<String>(
+    'message_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _partMeta = const VerificationMeta('part');
+  @override
+  late final GeneratedColumn<int> part = GeneratedColumn<int>(
+    'part',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _chatIdMeta = const VerificationMeta('chatId');
+  @override
+  late final GeneratedColumn<String> chatId = GeneratedColumn<String>(
+    'chat_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _totalMeta = const VerificationMeta('total');
+  @override
+  late final GeneratedColumn<int> total = GeneratedColumn<int>(
+    'total',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _dataMeta = const VerificationMeta('data');
+  @override
+  late final GeneratedColumn<Uint8List> data = GeneratedColumn<Uint8List>(
+    'data',
+    aliasedName,
+    false,
+    type: DriftSqlType.blob,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sentAtMeta = const VerificationMeta('sentAt');
+  @override
+  late final GeneratedColumn<int> sentAt = GeneratedColumn<int>(
+    'sent_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _ttlSecondsMeta = const VerificationMeta(
+    'ttlSeconds',
+  );
+  @override
+  late final GeneratedColumn<int> ttlSeconds = GeneratedColumn<int>(
+    'ttl_seconds',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _widthMeta = const VerificationMeta('width');
+  @override
+  late final GeneratedColumn<int> width = GeneratedColumn<int>(
+    'width',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _heightMeta = const VerificationMeta('height');
+  @override
+  late final GeneratedColumn<int> height = GeneratedColumn<int>(
+    'height',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sha256Meta = const VerificationMeta('sha256');
+  @override
+  late final GeneratedColumn<String> sha256 = GeneratedColumn<String>(
+    'sha256',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _replyToMeta = const VerificationMeta(
+    'replyTo',
+  );
+  @override
+  late final GeneratedColumn<String> replyTo = GeneratedColumn<String>(
+    'reply_to',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    messageId,
+    part,
+    chatId,
+    total,
+    data,
+    sentAt,
+    ttlSeconds,
+    width,
+    height,
+    sha256,
+    replyTo,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'media_parts';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MediaPart> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('message_id')) {
+      context.handle(
+        _messageIdMeta,
+        messageId.isAcceptableOrUnknown(data['message_id']!, _messageIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_messageIdMeta);
+    }
+    if (data.containsKey('part')) {
+      context.handle(
+        _partMeta,
+        part.isAcceptableOrUnknown(data['part']!, _partMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_partMeta);
+    }
+    if (data.containsKey('chat_id')) {
+      context.handle(
+        _chatIdMeta,
+        chatId.isAcceptableOrUnknown(data['chat_id']!, _chatIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_chatIdMeta);
+    }
+    if (data.containsKey('total')) {
+      context.handle(
+        _totalMeta,
+        total.isAcceptableOrUnknown(data['total']!, _totalMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_totalMeta);
+    }
+    if (data.containsKey('data')) {
+      context.handle(
+        _dataMeta,
+        this.data.isAcceptableOrUnknown(data['data']!, _dataMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dataMeta);
+    }
+    if (data.containsKey('sent_at')) {
+      context.handle(
+        _sentAtMeta,
+        sentAt.isAcceptableOrUnknown(data['sent_at']!, _sentAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sentAtMeta);
+    }
+    if (data.containsKey('ttl_seconds')) {
+      context.handle(
+        _ttlSecondsMeta,
+        ttlSeconds.isAcceptableOrUnknown(data['ttl_seconds']!, _ttlSecondsMeta),
+      );
+    }
+    if (data.containsKey('width')) {
+      context.handle(
+        _widthMeta,
+        width.isAcceptableOrUnknown(data['width']!, _widthMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_widthMeta);
+    }
+    if (data.containsKey('height')) {
+      context.handle(
+        _heightMeta,
+        height.isAcceptableOrUnknown(data['height']!, _heightMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_heightMeta);
+    }
+    if (data.containsKey('sha256')) {
+      context.handle(
+        _sha256Meta,
+        sha256.isAcceptableOrUnknown(data['sha256']!, _sha256Meta),
+      );
+    } else if (isInserting) {
+      context.missing(_sha256Meta);
+    }
+    if (data.containsKey('reply_to')) {
+      context.handle(
+        _replyToMeta,
+        replyTo.isAcceptableOrUnknown(data['reply_to']!, _replyToMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {messageId, part};
+  @override
+  MediaPart map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MediaPart(
+      messageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}message_id'],
+      )!,
+      part: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}part'],
+      )!,
+      chatId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chat_id'],
+      )!,
+      total: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}total'],
+      )!,
+      data: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}data'],
+      )!,
+      sentAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sent_at'],
+      )!,
+      ttlSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ttl_seconds'],
+      ),
+      width: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}width'],
+      )!,
+      height: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}height'],
+      )!,
+      sha256: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sha256'],
+      )!,
+      replyTo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reply_to'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $MediaPartsTable createAlias(String alias) {
+    return $MediaPartsTable(attachedDatabase, alias);
+  }
+}
+
+class MediaPart extends DataClass implements Insertable<MediaPart> {
+  final String messageId;
+  final int part;
+  final String chatId;
+  final int total;
+  final Uint8List data;
+  final int sentAt;
+  final int? ttlSeconds;
+  final int width;
+  final int height;
+  final String sha256;
+  final String? replyTo;
+  final int createdAt;
+  const MediaPart({
+    required this.messageId,
+    required this.part,
+    required this.chatId,
+    required this.total,
+    required this.data,
+    required this.sentAt,
+    this.ttlSeconds,
+    required this.width,
+    required this.height,
+    required this.sha256,
+    this.replyTo,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['message_id'] = Variable<String>(messageId);
+    map['part'] = Variable<int>(part);
+    map['chat_id'] = Variable<String>(chatId);
+    map['total'] = Variable<int>(total);
+    map['data'] = Variable<Uint8List>(data);
+    map['sent_at'] = Variable<int>(sentAt);
+    if (!nullToAbsent || ttlSeconds != null) {
+      map['ttl_seconds'] = Variable<int>(ttlSeconds);
+    }
+    map['width'] = Variable<int>(width);
+    map['height'] = Variable<int>(height);
+    map['sha256'] = Variable<String>(sha256);
+    if (!nullToAbsent || replyTo != null) {
+      map['reply_to'] = Variable<String>(replyTo);
+    }
+    map['created_at'] = Variable<int>(createdAt);
+    return map;
+  }
+
+  MediaPartsCompanion toCompanion(bool nullToAbsent) {
+    return MediaPartsCompanion(
+      messageId: Value(messageId),
+      part: Value(part),
+      chatId: Value(chatId),
+      total: Value(total),
+      data: Value(data),
+      sentAt: Value(sentAt),
+      ttlSeconds: ttlSeconds == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ttlSeconds),
+      width: Value(width),
+      height: Value(height),
+      sha256: Value(sha256),
+      replyTo: replyTo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(replyTo),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory MediaPart.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MediaPart(
+      messageId: serializer.fromJson<String>(json['messageId']),
+      part: serializer.fromJson<int>(json['part']),
+      chatId: serializer.fromJson<String>(json['chatId']),
+      total: serializer.fromJson<int>(json['total']),
+      data: serializer.fromJson<Uint8List>(json['data']),
+      sentAt: serializer.fromJson<int>(json['sentAt']),
+      ttlSeconds: serializer.fromJson<int?>(json['ttlSeconds']),
+      width: serializer.fromJson<int>(json['width']),
+      height: serializer.fromJson<int>(json['height']),
+      sha256: serializer.fromJson<String>(json['sha256']),
+      replyTo: serializer.fromJson<String?>(json['replyTo']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'messageId': serializer.toJson<String>(messageId),
+      'part': serializer.toJson<int>(part),
+      'chatId': serializer.toJson<String>(chatId),
+      'total': serializer.toJson<int>(total),
+      'data': serializer.toJson<Uint8List>(data),
+      'sentAt': serializer.toJson<int>(sentAt),
+      'ttlSeconds': serializer.toJson<int?>(ttlSeconds),
+      'width': serializer.toJson<int>(width),
+      'height': serializer.toJson<int>(height),
+      'sha256': serializer.toJson<String>(sha256),
+      'replyTo': serializer.toJson<String?>(replyTo),
+      'createdAt': serializer.toJson<int>(createdAt),
+    };
+  }
+
+  MediaPart copyWith({
+    String? messageId,
+    int? part,
+    String? chatId,
+    int? total,
+    Uint8List? data,
+    int? sentAt,
+    Value<int?> ttlSeconds = const Value.absent(),
+    int? width,
+    int? height,
+    String? sha256,
+    Value<String?> replyTo = const Value.absent(),
+    int? createdAt,
+  }) => MediaPart(
+    messageId: messageId ?? this.messageId,
+    part: part ?? this.part,
+    chatId: chatId ?? this.chatId,
+    total: total ?? this.total,
+    data: data ?? this.data,
+    sentAt: sentAt ?? this.sentAt,
+    ttlSeconds: ttlSeconds.present ? ttlSeconds.value : this.ttlSeconds,
+    width: width ?? this.width,
+    height: height ?? this.height,
+    sha256: sha256 ?? this.sha256,
+    replyTo: replyTo.present ? replyTo.value : this.replyTo,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  MediaPart copyWithCompanion(MediaPartsCompanion data) {
+    return MediaPart(
+      messageId: data.messageId.present ? data.messageId.value : this.messageId,
+      part: data.part.present ? data.part.value : this.part,
+      chatId: data.chatId.present ? data.chatId.value : this.chatId,
+      total: data.total.present ? data.total.value : this.total,
+      data: data.data.present ? data.data.value : this.data,
+      sentAt: data.sentAt.present ? data.sentAt.value : this.sentAt,
+      ttlSeconds: data.ttlSeconds.present
+          ? data.ttlSeconds.value
+          : this.ttlSeconds,
+      width: data.width.present ? data.width.value : this.width,
+      height: data.height.present ? data.height.value : this.height,
+      sha256: data.sha256.present ? data.sha256.value : this.sha256,
+      replyTo: data.replyTo.present ? data.replyTo.value : this.replyTo,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MediaPart(')
+          ..write('messageId: $messageId, ')
+          ..write('part: $part, ')
+          ..write('chatId: $chatId, ')
+          ..write('total: $total, ')
+          ..write('data: $data, ')
+          ..write('sentAt: $sentAt, ')
+          ..write('ttlSeconds: $ttlSeconds, ')
+          ..write('width: $width, ')
+          ..write('height: $height, ')
+          ..write('sha256: $sha256, ')
+          ..write('replyTo: $replyTo, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    messageId,
+    part,
+    chatId,
+    total,
+    $driftBlobEquality.hash(data),
+    sentAt,
+    ttlSeconds,
+    width,
+    height,
+    sha256,
+    replyTo,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MediaPart &&
+          other.messageId == this.messageId &&
+          other.part == this.part &&
+          other.chatId == this.chatId &&
+          other.total == this.total &&
+          $driftBlobEquality.equals(other.data, this.data) &&
+          other.sentAt == this.sentAt &&
+          other.ttlSeconds == this.ttlSeconds &&
+          other.width == this.width &&
+          other.height == this.height &&
+          other.sha256 == this.sha256 &&
+          other.replyTo == this.replyTo &&
+          other.createdAt == this.createdAt);
+}
+
+class MediaPartsCompanion extends UpdateCompanion<MediaPart> {
+  final Value<String> messageId;
+  final Value<int> part;
+  final Value<String> chatId;
+  final Value<int> total;
+  final Value<Uint8List> data;
+  final Value<int> sentAt;
+  final Value<int?> ttlSeconds;
+  final Value<int> width;
+  final Value<int> height;
+  final Value<String> sha256;
+  final Value<String?> replyTo;
+  final Value<int> createdAt;
+  final Value<int> rowid;
+  const MediaPartsCompanion({
+    this.messageId = const Value.absent(),
+    this.part = const Value.absent(),
+    this.chatId = const Value.absent(),
+    this.total = const Value.absent(),
+    this.data = const Value.absent(),
+    this.sentAt = const Value.absent(),
+    this.ttlSeconds = const Value.absent(),
+    this.width = const Value.absent(),
+    this.height = const Value.absent(),
+    this.sha256 = const Value.absent(),
+    this.replyTo = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  MediaPartsCompanion.insert({
+    required String messageId,
+    required int part,
+    required String chatId,
+    required int total,
+    required Uint8List data,
+    required int sentAt,
+    this.ttlSeconds = const Value.absent(),
+    required int width,
+    required int height,
+    required String sha256,
+    this.replyTo = const Value.absent(),
+    required int createdAt,
+    this.rowid = const Value.absent(),
+  }) : messageId = Value(messageId),
+       part = Value(part),
+       chatId = Value(chatId),
+       total = Value(total),
+       data = Value(data),
+       sentAt = Value(sentAt),
+       width = Value(width),
+       height = Value(height),
+       sha256 = Value(sha256),
+       createdAt = Value(createdAt);
+  static Insertable<MediaPart> custom({
+    Expression<String>? messageId,
+    Expression<int>? part,
+    Expression<String>? chatId,
+    Expression<int>? total,
+    Expression<Uint8List>? data,
+    Expression<int>? sentAt,
+    Expression<int>? ttlSeconds,
+    Expression<int>? width,
+    Expression<int>? height,
+    Expression<String>? sha256,
+    Expression<String>? replyTo,
+    Expression<int>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (messageId != null) 'message_id': messageId,
+      if (part != null) 'part': part,
+      if (chatId != null) 'chat_id': chatId,
+      if (total != null) 'total': total,
+      if (data != null) 'data': data,
+      if (sentAt != null) 'sent_at': sentAt,
+      if (ttlSeconds != null) 'ttl_seconds': ttlSeconds,
+      if (width != null) 'width': width,
+      if (height != null) 'height': height,
+      if (sha256 != null) 'sha256': sha256,
+      if (replyTo != null) 'reply_to': replyTo,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  MediaPartsCompanion copyWith({
+    Value<String>? messageId,
+    Value<int>? part,
+    Value<String>? chatId,
+    Value<int>? total,
+    Value<Uint8List>? data,
+    Value<int>? sentAt,
+    Value<int?>? ttlSeconds,
+    Value<int>? width,
+    Value<int>? height,
+    Value<String>? sha256,
+    Value<String?>? replyTo,
+    Value<int>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return MediaPartsCompanion(
+      messageId: messageId ?? this.messageId,
+      part: part ?? this.part,
+      chatId: chatId ?? this.chatId,
+      total: total ?? this.total,
+      data: data ?? this.data,
+      sentAt: sentAt ?? this.sentAt,
+      ttlSeconds: ttlSeconds ?? this.ttlSeconds,
+      width: width ?? this.width,
+      height: height ?? this.height,
+      sha256: sha256 ?? this.sha256,
+      replyTo: replyTo ?? this.replyTo,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (messageId.present) {
+      map['message_id'] = Variable<String>(messageId.value);
+    }
+    if (part.present) {
+      map['part'] = Variable<int>(part.value);
+    }
+    if (chatId.present) {
+      map['chat_id'] = Variable<String>(chatId.value);
+    }
+    if (total.present) {
+      map['total'] = Variable<int>(total.value);
+    }
+    if (data.present) {
+      map['data'] = Variable<Uint8List>(data.value);
+    }
+    if (sentAt.present) {
+      map['sent_at'] = Variable<int>(sentAt.value);
+    }
+    if (ttlSeconds.present) {
+      map['ttl_seconds'] = Variable<int>(ttlSeconds.value);
+    }
+    if (width.present) {
+      map['width'] = Variable<int>(width.value);
+    }
+    if (height.present) {
+      map['height'] = Variable<int>(height.value);
+    }
+    if (sha256.present) {
+      map['sha256'] = Variable<String>(sha256.value);
+    }
+    if (replyTo.present) {
+      map['reply_to'] = Variable<String>(replyTo.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MediaPartsCompanion(')
+          ..write('messageId: $messageId, ')
+          ..write('part: $part, ')
+          ..write('chatId: $chatId, ')
+          ..write('total: $total, ')
+          ..write('data: $data, ')
+          ..write('sentAt: $sentAt, ')
+          ..write('ttlSeconds: $ttlSeconds, ')
+          ..write('width: $width, ')
+          ..write('height: $height, ')
+          ..write('sha256: $sha256, ')
+          ..write('replyTo: $replyTo, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $AvatarsTable extends Avatars with TableInfo<$AvatarsTable, Avatar> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AvatarsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerIdMeta = const VerificationMeta(
+    'ownerId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerId = GeneratedColumn<String>(
+    'owner_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _bytesMeta = const VerificationMeta('bytes');
+  @override
+  late final GeneratedColumn<Uint8List> bytes = GeneratedColumn<Uint8List>(
+    'bytes',
+    aliasedName,
+    false,
+    type: DriftSqlType.blob,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [ownerId, bytes, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'avatars';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Avatar> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_id')) {
+      context.handle(
+        _ownerIdMeta,
+        ownerId.isAcceptableOrUnknown(data['owner_id']!, _ownerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerIdMeta);
+    }
+    if (data.containsKey('bytes')) {
+      context.handle(
+        _bytesMeta,
+        bytes.isAcceptableOrUnknown(data['bytes']!, _bytesMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_bytesMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerId};
+  @override
+  Avatar map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Avatar(
+      ownerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_id'],
+      )!,
+      bytes: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}bytes'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $AvatarsTable createAlias(String alias) {
+    return $AvatarsTable(attachedDatabase, alias);
+  }
+}
+
+class Avatar extends DataClass implements Insertable<Avatar> {
+  final String ownerId;
+  final Uint8List bytes;
+  final int updatedAt;
+  const Avatar({
+    required this.ownerId,
+    required this.bytes,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_id'] = Variable<String>(ownerId);
+    map['bytes'] = Variable<Uint8List>(bytes);
+    map['updated_at'] = Variable<int>(updatedAt);
+    return map;
+  }
+
+  AvatarsCompanion toCompanion(bool nullToAbsent) {
+    return AvatarsCompanion(
+      ownerId: Value(ownerId),
+      bytes: Value(bytes),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory Avatar.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Avatar(
+      ownerId: serializer.fromJson<String>(json['ownerId']),
+      bytes: serializer.fromJson<Uint8List>(json['bytes']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerId': serializer.toJson<String>(ownerId),
+      'bytes': serializer.toJson<Uint8List>(bytes),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+    };
+  }
+
+  Avatar copyWith({String? ownerId, Uint8List? bytes, int? updatedAt}) =>
+      Avatar(
+        ownerId: ownerId ?? this.ownerId,
+        bytes: bytes ?? this.bytes,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  Avatar copyWithCompanion(AvatarsCompanion data) {
+    return Avatar(
+      ownerId: data.ownerId.present ? data.ownerId.value : this.ownerId,
+      bytes: data.bytes.present ? data.bytes.value : this.bytes,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Avatar(')
+          ..write('ownerId: $ownerId, ')
+          ..write('bytes: $bytes, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(ownerId, $driftBlobEquality.hash(bytes), updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Avatar &&
+          other.ownerId == this.ownerId &&
+          $driftBlobEquality.equals(other.bytes, this.bytes) &&
+          other.updatedAt == this.updatedAt);
+}
+
+class AvatarsCompanion extends UpdateCompanion<Avatar> {
+  final Value<String> ownerId;
+  final Value<Uint8List> bytes;
+  final Value<int> updatedAt;
+  final Value<int> rowid;
+  const AvatarsCompanion({
+    this.ownerId = const Value.absent(),
+    this.bytes = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AvatarsCompanion.insert({
+    required String ownerId,
+    required Uint8List bytes,
+    required int updatedAt,
+    this.rowid = const Value.absent(),
+  }) : ownerId = Value(ownerId),
+       bytes = Value(bytes),
+       updatedAt = Value(updatedAt);
+  static Insertable<Avatar> custom({
+    Expression<String>? ownerId,
+    Expression<Uint8List>? bytes,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerId != null) 'owner_id': ownerId,
+      if (bytes != null) 'bytes': bytes,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AvatarsCompanion copyWith({
+    Value<String>? ownerId,
+    Value<Uint8List>? bytes,
+    Value<int>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return AvatarsCompanion(
+      ownerId: ownerId ?? this.ownerId,
+      bytes: bytes ?? this.bytes,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerId.present) {
+      map['owner_id'] = Variable<String>(ownerId.value);
+    }
+    if (bytes.present) {
+      map['bytes'] = Variable<Uint8List>(bytes.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AvatarsCompanion(')
+          ..write('ownerId: $ownerId, ')
+          ..write('bytes: $bytes, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2696,6 +4286,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $ChatsTable chats = $ChatsTable(this);
   late final $MessagesTable messages = $MessagesTable(this);
+  late final $MediaTable media = $MediaTable(this);
+  late final $MediaPartsTable mediaParts = $MediaPartsTable(this);
+  late final $AvatarsTable avatars = $AvatarsTable(this);
   late final $OlmSessionsTable olmSessions = $OlmSessionsTable(this);
   late final $OutboxTable outbox = $OutboxTable(this);
   late final $PendingDeletesTable pendingDeletes = $PendingDeletesTable(this);
@@ -2709,6 +4302,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     chats,
     messages,
+    media,
+    mediaParts,
+    avatars,
     olmSessions,
     outbox,
     pendingDeletes,
@@ -2724,6 +4320,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       ),
       result: [TableUpdate('messages', kind: UpdateKind.delete)],
     ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'messages',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('media', kind: UpdateKind.delete)],
+    ),
   ]);
 }
 
@@ -2737,6 +4340,11 @@ typedef $$ChatsTableCreateCompanionBuilder = ChatsCompanion Function({
   Value<int?> wipedBefore,
   required int createdAt,
   required int lastActivityAt,
+  Value<bool> blocked,
+  Value<bool> accepted,
+  Value<int> profileSentVersion,
+  Value<bool> refreshProfile,
+  Value<int> directoryCheckedAt,
   Value<int> rowid,
 });
 typedef $$ChatsTableUpdateCompanionBuilder = ChatsCompanion Function({
@@ -2749,6 +4357,11 @@ typedef $$ChatsTableUpdateCompanionBuilder = ChatsCompanion Function({
   Value<int?> wipedBefore,
   Value<int> createdAt,
   Value<int> lastActivityAt,
+  Value<bool> blocked,
+  Value<bool> accepted,
+  Value<int> profileSentVersion,
+  Value<bool> refreshProfile,
+  Value<int> directoryCheckedAt,
   Value<int> rowid,
 });
 
@@ -2825,6 +4438,31 @@ class $$ChatsTableFilterComposer extends Composer<_$AppDatabase, $ChatsTable> {
 
   ColumnFilters<int> get lastActivityAt => $composableBuilder(
     column: $table.lastActivityAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get blocked => $composableBuilder(
+    column: $table.blocked,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get accepted => $composableBuilder(
+    column: $table.accepted,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get profileSentVersion => $composableBuilder(
+    column: $table.profileSentVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get refreshProfile => $composableBuilder(
+    column: $table.refreshProfile,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get directoryCheckedAt => $composableBuilder(
+    column: $table.directoryCheckedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2907,6 +4545,31 @@ class $$ChatsTableOrderingComposer
     column: $table.lastActivityAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get blocked => $composableBuilder(
+    column: $table.blocked,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get accepted => $composableBuilder(
+    column: $table.accepted,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get profileSentVersion => $composableBuilder(
+    column: $table.profileSentVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get refreshProfile => $composableBuilder(
+    column: $table.refreshProfile,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get directoryCheckedAt => $composableBuilder(
+    column: $table.directoryCheckedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ChatsTableAnnotationComposer
@@ -2956,6 +4619,27 @@ class $$ChatsTableAnnotationComposer
 
   GeneratedColumn<int> get lastActivityAt => $composableBuilder(
     column: $table.lastActivityAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get blocked =>
+      $composableBuilder(column: $table.blocked, builder: (column) => column);
+
+  GeneratedColumn<bool> get accepted =>
+      $composableBuilder(column: $table.accepted, builder: (column) => column);
+
+  GeneratedColumn<int> get profileSentVersion => $composableBuilder(
+    column: $table.profileSentVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get refreshProfile => $composableBuilder(
+    column: $table.refreshProfile,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get directoryCheckedAt => $composableBuilder(
+    column: $table.directoryCheckedAt,
     builder: (column) => column,
   );
 
@@ -3022,6 +4706,11 @@ class $$ChatsTableTableManager
                 Value<int?> wipedBefore = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> lastActivityAt = const Value.absent(),
+                Value<bool> blocked = const Value.absent(),
+                Value<bool> accepted = const Value.absent(),
+                Value<int> profileSentVersion = const Value.absent(),
+                Value<bool> refreshProfile = const Value.absent(),
+                Value<int> directoryCheckedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ChatsCompanion(
                 peerId: peerId,
@@ -3033,6 +4722,11 @@ class $$ChatsTableTableManager
                 wipedBefore: wipedBefore,
                 createdAt: createdAt,
                 lastActivityAt: lastActivityAt,
+                blocked: blocked,
+                accepted: accepted,
+                profileSentVersion: profileSentVersion,
+                refreshProfile: refreshProfile,
+                directoryCheckedAt: directoryCheckedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3046,6 +4740,11 @@ class $$ChatsTableTableManager
                 Value<int?> wipedBefore = const Value.absent(),
                 required int createdAt,
                 required int lastActivityAt,
+                Value<bool> blocked = const Value.absent(),
+                Value<bool> accepted = const Value.absent(),
+                Value<int> profileSentVersion = const Value.absent(),
+                Value<bool> refreshProfile = const Value.absent(),
+                Value<int> directoryCheckedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ChatsCompanion.insert(
                 peerId: peerId,
@@ -3057,6 +4756,11 @@ class $$ChatsTableTableManager
                 wipedBefore: wipedBefore,
                 createdAt: createdAt,
                 lastActivityAt: lastActivityAt,
+                blocked: blocked,
+                accepted: accepted,
+                profileSentVersion: profileSentVersion,
+                refreshProfile: refreshProfile,
+                directoryCheckedAt: directoryCheckedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -3122,6 +4826,7 @@ typedef $$MessagesTableCreateCompanionBuilder = MessagesCompanion Function({
   required int localAt,
   Value<int?> expiresAt,
   required String status,
+  Value<String?> replyTo,
   Value<int> rowid,
 });
 typedef $$MessagesTableUpdateCompanionBuilder = MessagesCompanion Function({
@@ -3134,6 +4839,7 @@ typedef $$MessagesTableUpdateCompanionBuilder = MessagesCompanion Function({
   Value<int> localAt,
   Value<int?> expiresAt,
   Value<String> status,
+  Value<String?> replyTo,
   Value<int> rowid,
 });
 
@@ -3155,6 +4861,25 @@ final class $$MessagesTableReferences
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<$MediaTable, List<MediaItem>> _mediaRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.media,
+    aliasName: 'messages__id__media__message_id',
+  );
+
+  $$MediaTableProcessedTableManager get mediaRefs {
+    final manager = $$MediaTableTableManager(
+      $_db,
+      $_db.media,
+    ).filter((f) => f.messageId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_mediaRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
     );
   }
 }
@@ -3208,6 +4933,11 @@ class $$MessagesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get replyTo => $composableBuilder(
+    column: $table.replyTo,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$ChatsTableFilterComposer get chatId {
     final $$ChatsTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -3229,6 +4959,31 @@ class $$MessagesTableFilterComposer
           ),
     );
     return composer;
+  }
+
+  Expression<bool> mediaRefs(
+    Expression<bool> Function($$MediaTableFilterComposer f) f,
+  ) {
+    final $$MediaTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.media,
+      getReferencedColumn: (t) => t.messageId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MediaTableFilterComposer(
+            $db: $db,
+            $table: $db.media,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
   }
 }
 
@@ -3278,6 +5033,11 @@ class $$MessagesTableOrderingComposer
 
   ColumnOrderings<String> get status => $composableBuilder(
     column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get replyTo => $composableBuilder(
+    column: $table.replyTo,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -3338,6 +5098,9 @@ class $$MessagesTableAnnotationComposer
   GeneratedColumn<String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
 
+  GeneratedColumn<String> get replyTo =>
+      $composableBuilder(column: $table.replyTo, builder: (column) => column);
+
   $$ChatsTableAnnotationComposer get chatId {
     final $$ChatsTableAnnotationComposer composer = $composerBuilder(
       composer: this,
@@ -3360,6 +5123,31 @@ class $$MessagesTableAnnotationComposer
     );
     return composer;
   }
+
+  Expression<T> mediaRefs<T extends Object>(
+    Expression<T> Function($$MediaTableAnnotationComposer a) f,
+  ) {
+    final $$MediaTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.media,
+      getReferencedColumn: (t) => t.messageId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MediaTableAnnotationComposer(
+            $db: $db,
+            $table: $db.media,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$MessagesTableTableManager
@@ -3375,7 +5163,7 @@ class $$MessagesTableTableManager
           $$MessagesTableUpdateCompanionBuilder,
           (Message, $$MessagesTableReferences),
           Message,
-          PrefetchHooks Function({bool chatId})
+          PrefetchHooks Function({bool chatId, bool mediaRefs})
         > {
   $$MessagesTableTableManager(_$AppDatabase db, $MessagesTable table)
     : super(
@@ -3399,6 +5187,7 @@ class $$MessagesTableTableManager
                 Value<int> localAt = const Value.absent(),
                 Value<int?> expiresAt = const Value.absent(),
                 Value<String> status = const Value.absent(),
+                Value<String?> replyTo = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessagesCompanion(
                 id: id,
@@ -3410,6 +5199,7 @@ class $$MessagesTableTableManager
                 localAt: localAt,
                 expiresAt: expiresAt,
                 status: status,
+                replyTo: replyTo,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3423,6 +5213,7 @@ class $$MessagesTableTableManager
                 required int localAt,
                 Value<int?> expiresAt = const Value.absent(),
                 required String status,
+                Value<String?> replyTo = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessagesCompanion.insert(
                 id: id,
@@ -3434,6 +5225,7 @@ class $$MessagesTableTableManager
                 localAt: localAt,
                 expiresAt: expiresAt,
                 status: status,
+                replyTo: replyTo,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -3444,10 +5236,10 @@ class $$MessagesTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({chatId = false}) {
+          prefetchHooksCallback: ({chatId = false, mediaRefs = false}) {
             return PrefetchHooks(
               db: db,
-              explicitlyWatchedTables: [],
+              explicitlyWatchedTables: [if (mediaRefs) db.media],
               addJoins:
                   <
                     T extends TableManagerState<
@@ -3480,7 +5272,24 @@ class $$MessagesTableTableManager
                     return state;
                   },
               getPrefetchedDataCallback: (items) async {
-                return [];
+                return [
+                  if (mediaRefs)
+                    await $_getPrefetchedDataByColumns<
+                      Message,
+                      $MessagesTable,
+                      MediaItem,
+                      $MediaTable
+                    >(
+                      currentTable: table,
+                      referencedTable: $$MessagesTableReferences
+                          ._mediaRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$MessagesTableReferences(db, table, p0).mediaRefs,
+                      currentColumn: 'id',
+                      referencedColumn: 'message_id',
+                      typedResults: items,
+                    ),
+                ];
               },
             );
           },
@@ -3500,7 +5309,803 @@ typedef $$MessagesTableProcessedTableManager =
       $$MessagesTableUpdateCompanionBuilder,
       (Message, $$MessagesTableReferences),
       Message,
-      PrefetchHooks Function({bool chatId})
+      PrefetchHooks Function({bool chatId, bool mediaRefs})
+    >;
+typedef $$MediaTableCreateCompanionBuilder = MediaCompanion Function({
+  required String messageId,
+  required Uint8List bytes,
+  required int width,
+  required int height,
+  Value<int> rowid,
+});
+typedef $$MediaTableUpdateCompanionBuilder = MediaCompanion Function({
+  Value<String> messageId,
+  Value<Uint8List> bytes,
+  Value<int> width,
+  Value<int> height,
+  Value<int> rowid,
+});
+
+final class $$MediaTableReferences
+    extends BaseReferences<_$AppDatabase, $MediaTable, MediaItem> {
+  $$MediaTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $MessagesTable _messageIdTable(_$AppDatabase db) =>
+      db.messages.createAlias('media__message_id__messages__id');
+
+  $$MessagesTableProcessedTableManager get messageId {
+    final $_column = $_itemColumn<String>('message_id')!;
+
+    final manager = $$MessagesTableTableManager(
+      $_db,
+      $_db.messages,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_messageIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$MediaTableFilterComposer extends Composer<_$AppDatabase, $MediaTable> {
+  $$MediaTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<Uint8List> get bytes => $composableBuilder(
+    column: $table.bytes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get width => $composableBuilder(
+    column: $table.width,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get height => $composableBuilder(
+    column: $table.height,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$MessagesTableFilterComposer get messageId {
+    final $$MessagesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.messageId,
+      referencedTable: $db.messages,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessagesTableFilterComposer(
+            $db: $db,
+            $table: $db.messages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MediaTableOrderingComposer
+    extends Composer<_$AppDatabase, $MediaTable> {
+  $$MediaTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<Uint8List> get bytes => $composableBuilder(
+    column: $table.bytes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get width => $composableBuilder(
+    column: $table.width,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get height => $composableBuilder(
+    column: $table.height,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$MessagesTableOrderingComposer get messageId {
+    final $$MessagesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.messageId,
+      referencedTable: $db.messages,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessagesTableOrderingComposer(
+            $db: $db,
+            $table: $db.messages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MediaTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MediaTable> {
+  $$MediaTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<Uint8List> get bytes =>
+      $composableBuilder(column: $table.bytes, builder: (column) => column);
+
+  GeneratedColumn<int> get width =>
+      $composableBuilder(column: $table.width, builder: (column) => column);
+
+  GeneratedColumn<int> get height =>
+      $composableBuilder(column: $table.height, builder: (column) => column);
+
+  $$MessagesTableAnnotationComposer get messageId {
+    final $$MessagesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.messageId,
+      referencedTable: $db.messages,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessagesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.messages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MediaTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MediaTable,
+          MediaItem,
+          $$MediaTableFilterComposer,
+          $$MediaTableOrderingComposer,
+          $$MediaTableAnnotationComposer,
+          $$MediaTableCreateCompanionBuilder,
+          $$MediaTableUpdateCompanionBuilder,
+          (MediaItem, $$MediaTableReferences),
+          MediaItem,
+          PrefetchHooks Function({bool messageId})
+        > {
+  $$MediaTableTableManager(_$AppDatabase db, $MediaTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MediaTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MediaTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MediaTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> messageId = const Value.absent(),
+                Value<Uint8List> bytes = const Value.absent(),
+                Value<int> width = const Value.absent(),
+                Value<int> height = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MediaCompanion(
+                messageId: messageId,
+                bytes: bytes,
+                width: width,
+                height: height,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String messageId,
+                required Uint8List bytes,
+                required int width,
+                required int height,
+                Value<int> rowid = const Value.absent(),
+              }) => MediaCompanion.insert(
+                messageId: messageId,
+                bytes: bytes,
+                width: width,
+                height: height,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$MediaTable, MediaItem>(table),
+                  $$MediaTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({messageId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (messageId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.messageId,
+                        referencedTable: $$MediaTableReferences._messageIdTable(
+                          db,
+                        ),
+                        referencedColumn: $$MediaTableReferences
+                            ._messageIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$MediaTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MediaTable,
+      MediaItem,
+      $$MediaTableFilterComposer,
+      $$MediaTableOrderingComposer,
+      $$MediaTableAnnotationComposer,
+      $$MediaTableCreateCompanionBuilder,
+      $$MediaTableUpdateCompanionBuilder,
+      (MediaItem, $$MediaTableReferences),
+      MediaItem,
+      PrefetchHooks Function({bool messageId})
+    >;
+typedef $$MediaPartsTableCreateCompanionBuilder = MediaPartsCompanion Function({
+  required String messageId,
+  required int part,
+  required String chatId,
+  required int total,
+  required Uint8List data,
+  required int sentAt,
+  Value<int?> ttlSeconds,
+  required int width,
+  required int height,
+  required String sha256,
+  Value<String?> replyTo,
+  required int createdAt,
+  Value<int> rowid,
+});
+typedef $$MediaPartsTableUpdateCompanionBuilder = MediaPartsCompanion Function({
+  Value<String> messageId,
+  Value<int> part,
+  Value<String> chatId,
+  Value<int> total,
+  Value<Uint8List> data,
+  Value<int> sentAt,
+  Value<int?> ttlSeconds,
+  Value<int> width,
+  Value<int> height,
+  Value<String> sha256,
+  Value<String?> replyTo,
+  Value<int> createdAt,
+  Value<int> rowid,
+});
+
+class $$MediaPartsTableFilterComposer
+    extends Composer<_$AppDatabase, $MediaPartsTable> {
+  $$MediaPartsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get messageId => $composableBuilder(
+    column: $table.messageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get part => $composableBuilder(
+    column: $table.part,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get chatId => $composableBuilder(
+    column: $table.chatId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get total => $composableBuilder(
+    column: $table.total,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get data => $composableBuilder(
+    column: $table.data,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sentAt => $composableBuilder(
+    column: $table.sentAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ttlSeconds => $composableBuilder(
+    column: $table.ttlSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get width => $composableBuilder(
+    column: $table.width,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get height => $composableBuilder(
+    column: $table.height,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sha256 => $composableBuilder(
+    column: $table.sha256,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get replyTo => $composableBuilder(
+    column: $table.replyTo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$MediaPartsTableOrderingComposer
+    extends Composer<_$AppDatabase, $MediaPartsTable> {
+  $$MediaPartsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get messageId => $composableBuilder(
+    column: $table.messageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get part => $composableBuilder(
+    column: $table.part,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get chatId => $composableBuilder(
+    column: $table.chatId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get total => $composableBuilder(
+    column: $table.total,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<Uint8List> get data => $composableBuilder(
+    column: $table.data,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sentAt => $composableBuilder(
+    column: $table.sentAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get ttlSeconds => $composableBuilder(
+    column: $table.ttlSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get width => $composableBuilder(
+    column: $table.width,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get height => $composableBuilder(
+    column: $table.height,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sha256 => $composableBuilder(
+    column: $table.sha256,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get replyTo => $composableBuilder(
+    column: $table.replyTo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$MediaPartsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MediaPartsTable> {
+  $$MediaPartsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get messageId =>
+      $composableBuilder(column: $table.messageId, builder: (column) => column);
+
+  GeneratedColumn<int> get part =>
+      $composableBuilder(column: $table.part, builder: (column) => column);
+
+  GeneratedColumn<String> get chatId =>
+      $composableBuilder(column: $table.chatId, builder: (column) => column);
+
+  GeneratedColumn<int> get total =>
+      $composableBuilder(column: $table.total, builder: (column) => column);
+
+  GeneratedColumn<Uint8List> get data =>
+      $composableBuilder(column: $table.data, builder: (column) => column);
+
+  GeneratedColumn<int> get sentAt =>
+      $composableBuilder(column: $table.sentAt, builder: (column) => column);
+
+  GeneratedColumn<int> get ttlSeconds => $composableBuilder(
+    column: $table.ttlSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get width =>
+      $composableBuilder(column: $table.width, builder: (column) => column);
+
+  GeneratedColumn<int> get height =>
+      $composableBuilder(column: $table.height, builder: (column) => column);
+
+  GeneratedColumn<String> get sha256 =>
+      $composableBuilder(column: $table.sha256, builder: (column) => column);
+
+  GeneratedColumn<String> get replyTo =>
+      $composableBuilder(column: $table.replyTo, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$MediaPartsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MediaPartsTable,
+          MediaPart,
+          $$MediaPartsTableFilterComposer,
+          $$MediaPartsTableOrderingComposer,
+          $$MediaPartsTableAnnotationComposer,
+          $$MediaPartsTableCreateCompanionBuilder,
+          $$MediaPartsTableUpdateCompanionBuilder,
+          (
+            MediaPart,
+            BaseReferences<_$AppDatabase, $MediaPartsTable, MediaPart>,
+          ),
+          MediaPart,
+          PrefetchHooks Function()
+        > {
+  $$MediaPartsTableTableManager(_$AppDatabase db, $MediaPartsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MediaPartsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MediaPartsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MediaPartsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> messageId = const Value.absent(),
+                Value<int> part = const Value.absent(),
+                Value<String> chatId = const Value.absent(),
+                Value<int> total = const Value.absent(),
+                Value<Uint8List> data = const Value.absent(),
+                Value<int> sentAt = const Value.absent(),
+                Value<int?> ttlSeconds = const Value.absent(),
+                Value<int> width = const Value.absent(),
+                Value<int> height = const Value.absent(),
+                Value<String> sha256 = const Value.absent(),
+                Value<String?> replyTo = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MediaPartsCompanion(
+                messageId: messageId,
+                part: part,
+                chatId: chatId,
+                total: total,
+                data: data,
+                sentAt: sentAt,
+                ttlSeconds: ttlSeconds,
+                width: width,
+                height: height,
+                sha256: sha256,
+                replyTo: replyTo,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String messageId,
+                required int part,
+                required String chatId,
+                required int total,
+                required Uint8List data,
+                required int sentAt,
+                Value<int?> ttlSeconds = const Value.absent(),
+                required int width,
+                required int height,
+                required String sha256,
+                Value<String?> replyTo = const Value.absent(),
+                required int createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => MediaPartsCompanion.insert(
+                messageId: messageId,
+                part: part,
+                chatId: chatId,
+                total: total,
+                data: data,
+                sentAt: sentAt,
+                ttlSeconds: ttlSeconds,
+                width: width,
+                height: height,
+                sha256: sha256,
+                replyTo: replyTo,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$MediaPartsTable, MediaPart>(table),
+                  BaseReferences<_$AppDatabase, $MediaPartsTable, MediaPart>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$MediaPartsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MediaPartsTable,
+      MediaPart,
+      $$MediaPartsTableFilterComposer,
+      $$MediaPartsTableOrderingComposer,
+      $$MediaPartsTableAnnotationComposer,
+      $$MediaPartsTableCreateCompanionBuilder,
+      $$MediaPartsTableUpdateCompanionBuilder,
+      (MediaPart, BaseReferences<_$AppDatabase, $MediaPartsTable, MediaPart>),
+      MediaPart,
+      PrefetchHooks Function()
+    >;
+typedef $$AvatarsTableCreateCompanionBuilder = AvatarsCompanion Function({
+  required String ownerId,
+  required Uint8List bytes,
+  required int updatedAt,
+  Value<int> rowid,
+});
+typedef $$AvatarsTableUpdateCompanionBuilder = AvatarsCompanion Function({
+  Value<String> ownerId,
+  Value<Uint8List> bytes,
+  Value<int> updatedAt,
+  Value<int> rowid,
+});
+
+class $$AvatarsTableFilterComposer
+    extends Composer<_$AppDatabase, $AvatarsTable> {
+  $$AvatarsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerId => $composableBuilder(
+    column: $table.ownerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get bytes => $composableBuilder(
+    column: $table.bytes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$AvatarsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AvatarsTable> {
+  $$AvatarsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerId => $composableBuilder(
+    column: $table.ownerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<Uint8List> get bytes => $composableBuilder(
+    column: $table.bytes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AvatarsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AvatarsTable> {
+  $$AvatarsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerId =>
+      $composableBuilder(column: $table.ownerId, builder: (column) => column);
+
+  GeneratedColumn<Uint8List> get bytes =>
+      $composableBuilder(column: $table.bytes, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$AvatarsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AvatarsTable,
+          Avatar,
+          $$AvatarsTableFilterComposer,
+          $$AvatarsTableOrderingComposer,
+          $$AvatarsTableAnnotationComposer,
+          $$AvatarsTableCreateCompanionBuilder,
+          $$AvatarsTableUpdateCompanionBuilder,
+          (Avatar, BaseReferences<_$AppDatabase, $AvatarsTable, Avatar>),
+          Avatar,
+          PrefetchHooks Function()
+        > {
+  $$AvatarsTableTableManager(_$AppDatabase db, $AvatarsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AvatarsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AvatarsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AvatarsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerId = const Value.absent(),
+                Value<Uint8List> bytes = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AvatarsCompanion(
+                ownerId: ownerId,
+                bytes: bytes,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerId,
+                required Uint8List bytes,
+                required int updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => AvatarsCompanion.insert(
+                ownerId: ownerId,
+                bytes: bytes,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$AvatarsTable, Avatar>(table),
+                  BaseReferences<_$AppDatabase, $AvatarsTable, Avatar>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AvatarsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AvatarsTable,
+      Avatar,
+      $$AvatarsTableFilterComposer,
+      $$AvatarsTableOrderingComposer,
+      $$AvatarsTableAnnotationComposer,
+      $$AvatarsTableCreateCompanionBuilder,
+      $$AvatarsTableUpdateCompanionBuilder,
+      (Avatar, BaseReferences<_$AppDatabase, $AvatarsTable, Avatar>),
+      Avatar,
+      PrefetchHooks Function()
     >;
 typedef $$OlmSessionsTableCreateCompanionBuilder =
     OlmSessionsCompanion Function({
@@ -4441,6 +7046,12 @@ class $AppDatabaseManager {
       $$ChatsTableTableManager(_db, _db.chats);
   $$MessagesTableTableManager get messages =>
       $$MessagesTableTableManager(_db, _db.messages);
+  $$MediaTableTableManager get media =>
+      $$MediaTableTableManager(_db, _db.media);
+  $$MediaPartsTableTableManager get mediaParts =>
+      $$MediaPartsTableTableManager(_db, _db.mediaParts);
+  $$AvatarsTableTableManager get avatars =>
+      $$AvatarsTableTableManager(_db, _db.avatars);
   $$OlmSessionsTableTableManager get olmSessions =>
       $$OlmSessionsTableTableManager(_db, _db.olmSessions);
   $$OutboxTableTableManager get outbox =>

@@ -47,6 +47,7 @@ crash reports. Raise `version:` in `pubspec.yaml` for every upload.
 | Personal info: e-mail address | Collected, required. Purpose: account management (sign-in codes). |
 | Personal info: phone number | Collected, required. Purpose: account management. Stored encrypted. |
 | Personal info: user ids (username) | Collected, required. Purpose: app functionality (discovery). |
+| Photos | Same as messages: end-to-end encrypted, unreadable by the developer, held until delivery (at most 7 days). Metadata is stripped on the phone. |
 | Messages: other in-app messages | Collected only as end-to-end-encrypted data that the developer cannot read, held until delivery. Google's guidance: data that is end-to-end encrypted and unreadable by the developer may be declared as not collected; review the current wording before answering. |
 | Device or other ids | Firebase Installation ID for push, if push is enabled. Purpose: app functionality. |
 | Location, contacts, photos, files, app activity, web history, health, financial | Not collected. |

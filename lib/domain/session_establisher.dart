@@ -45,6 +45,9 @@ class SessionEstablisher {
     final keysChanged = existing != null && existing.peerIdentityKey != peer.identityKey;
     if (existing == null || keysChanged || !await crypto.hasSession(peer.userId)) {
       await _establish(peer);
+    } else if (!existing.accepted) {
+      // Starting a chat with someone who sent a request accepts it.
+      await messages.acceptChat(peer.userId);
     }
     return peer;
   }

@@ -75,6 +75,26 @@ and recipient user ids, the envelope type column (`message`, `receipt`,
 `delete`, the same type as a routine relayed timer deletion. There is no sealed
 sender and no post-quantum key agreement (Signal has both).
 
+Since v2 the server also sees: a photo as several `message` envelopes of up
+to 64 KB sent together (so it can guess "this was a photo" and its rough
+size); profile-picture updates as `receipt` envelopes; who blocked and who
+reported whom; and, roughly every 15 minutes, an unauthenticated inbox check
+per phone (user id + random token, answered with a count).
+
+### Photos and profile pictures
+
+The phone re-encodes every picture with `package:image` before it is
+encrypted: camera rotation is applied, then all EXIF/ICC/text metadata is
+dropped (GPS location, camera model, timestamps), and the image is shrunk
+(photos: at most 1600 px, about 300 KB; profile pictures: 256 px square, about
+24 KB). A photo is split into 30 KB parts; every part is an ordinary Olm
+message (authenticated encryption), and a SHA-256 of the whole JPEG inside
+the encrypted parts is checked after joining them, so parts cannot be mixed
+between photos. No extra cryptography is used for attachments. Photo parts
+expire on the server after 7 days at most. Profile pictures go only to
+accepted, unblocked chats; usernames are always taken from the directory, never
+from a peer's message, so a peer cannot pose as someone else.
+
 ## 2. Data at rest on the phone
 
 * **Database:** SQLite with SQLCipher (community edition bundled by
@@ -147,7 +167,8 @@ one-time code, and new passwords are set.
 
 ## 4. Auto-delete timers
 
-* Options: Off, 1 hour, 5 hours, 1 day, 1 week. Free version: at most 2 chats
+* Options: Off, 1 day, 1 week (1 hour and 5 hours were removed in v2; values
+  from older apps are still honoured). Free version: at most 2 chats
   with a timer at a time (enabling a third shows the upsell). A timer set by
   the peer is always honoured, even beyond the local limit: refusing it would
   keep their messages longer than they asked.
@@ -203,6 +224,15 @@ one-time code, and new passwords are set.
 * Username lookups and one-time-key claims are not rate limited yet; key
   claiming can be used to exhaust one-time keys (the fallback key keeps
   sessions possible).
+* Spam suspension can be abused by 5 coordinated accounts (each older than a
+  day). The operator can lift a suspension (README section 2). A changed
+  username becomes free immediately, so someone else can register it; existing
+  chats are tied to the user id and are not affected.
+* Image decoding (Flutter/Skia for display, package:image for re-encoding)
+  processes pictures from other people; a decoder bug could be exploitable.
+  Only JPEGs are accepted from peers.
+* Copy text puts message text on the system clipboard, where other apps and
+  keyboards may read it.
 * If the Keystore entry is lost, the database cannot be decrypted and the app
   starts over.
 

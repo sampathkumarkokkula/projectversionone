@@ -3,8 +3,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../data/media/image_processor.dart';
 import '../../data/remote/supabase_backend.dart';
 import '../../domain/lock_service.dart';
+import '../../domain/message_service.dart';
 import '../../domain/ports.dart';
 import '../../domain/session_establisher.dart';
 
@@ -31,6 +33,16 @@ String describeError(Object error) {
   if (error is PasswordPolicyException) return error.message;
   if (error is UsernameTakenException) return 'That username is already taken.';
   if (error is SelfChatException) return 'That is your own username.';
+  if (error is UsernameChangeTooSoonException) return 'You can change your username once every 24 hours.';
+  if (error is AccountSuspendedException) {
+    return 'This account was suspended after spam reports and can no longer send messages.';
+  }
+  if (error is EmailBlockedException) return 'This e-mail address can\'t be used with BVM.';
+  if (error is ChatBlockedException) return 'Unblock this person to send messages.';
+  if (error is UnsupportedImageException) return 'This picture format isn\'t supported. Try a JPEG or PNG.';
+  if (error is ArgumentError && '${error.message}'.contains('image too large')) {
+    return 'This photo is too large to send.';
+  }
   if (error is PeerGoneException) return 'This person deleted their account.';
   if (error is PeerUnavailableException) return 'This person cannot receive messages right now. Try again later.';
   if (error is DeviceReplacedException) {
@@ -47,6 +59,7 @@ String describeError(Object error) {
     if (error.statusCode == '429' || code.contains('rate_limit')) {
       return 'Too many requests. Wait a minute and try again.';
     }
+    if (error.message.contains('cannot be used')) return 'This e-mail address can\'t be used with BVM.';
     return 'Sign-in failed. Check the code and try again.';
   }
   if (error is SocketException || error.toString().contains('SocketException')) {

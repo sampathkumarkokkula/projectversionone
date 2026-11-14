@@ -52,10 +52,45 @@ class DeviceKeyStore {
     return created;
   }
 
+  static const _inbox = 'bvm.inbox.v1';
+
+  /// Token for the background "any new messages?" check, or null.
+  Future<InboxCredentials?> inboxCredentials() async {
+    final raw = await storage.read(key: _inbox);
+    if (raw == null) return null;
+    try {
+      final map = jsonDecode(raw);
+      if (map is! Map<String, dynamic>) return null;
+      final user = map['u'];
+      final token = map['t'];
+      final device = map['d'];
+      if (user is! String || token is! String || device is! String) return null;
+      return InboxCredentials(userId: user, token: token, deviceKey: device);
+    } on FormatException {
+      return null;
+    }
+  }
+
+  Future<void> saveInboxCredentials(InboxCredentials c) =>
+      storage.write(key: _inbox, value: jsonEncode({'u': c.userId, 't': c.token, 'd': c.deviceKey}));
+
   /// Removes every secret this app stored (account deletion / reset).
   Future<void> wipe() => storage.deleteAll();
 
   static bool _isHexKey(String value) => RegExp(r'^[0-9a-f]{64}$').hasMatch(value);
 
   static String _hex(Uint8List bytes) => bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+}
+
+/// What the background task needs to ask the server whether messages wait.
+class InboxCredentials {
+  const InboxCredentials({required this.userId, required this.token, required this.deviceKey});
+
+  final String userId;
+
+  /// Random 256-bit token (base64url); the server stores only its SHA-256.
+  final String token;
+
+  /// Identity key of the phone that registered the token.
+  final String deviceKey;
 }

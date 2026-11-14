@@ -37,6 +37,9 @@ class SyncEngine {
   final WipeService wipe;
   final Clock clock;
 
+  /// Called after a pass that stored new messages (for notifications).
+  void Function(int count)? onNewMessages;
+
   Future<void>? _running;
   bool _again = false;
 
@@ -64,16 +67,33 @@ class SyncEngine {
   }
 
   Future<void> _passOnce() async {
+    var received = 0;
     try {
       await _deliverPendingCommands();
-      await _pull();
+      received = await _pull();
       await _repairSessions();
     } on DeviceReplacedException {
       rethrow;
     } on Object catch (e) {
       logDebug('sync: receive step failed (${e.runtimeType})');
     }
+    if (received > 0) onNewMessages?.call(received);
+    try {
+      await _refreshDirectory();
+      await messages.shareProfile();
+    } on DeviceReplacedException {
+      rethrow;
+    } on Object catch (e) {
+      logDebug('sync: profile step failed (${e.runtimeType})');
+    }
     await flushOutbox();
+  }
+
+  /// Picks up username changes of chat peers from the directory.
+  Future<void> _refreshDirectory() async {
+    for (final chat in await messages.chatsDueForDirectoryCheck()) {
+      await messages.applyDirectoryEntry(chat, await directory.getUser(chat.peerId));
+    }
   }
 
   /// Wipe and delete commands can only be encrypted once a session exists.
@@ -102,10 +122,12 @@ class SyncEngine {
     await messages.relayPendingDeletes();
   }
 
-  Future<void> _pull() async {
+  /// Returns the number of new chat messages stored.
+  Future<int> _pull() async {
+    var received = 0;
     for (var round = 0; round < 20; round++) {
       final batch = await relay.fetchPending(limit: 100);
-      if (batch.isEmpty) return;
+      if (batch.isEmpty) return received;
       final handled = <String>[];
       final delivered = <String, List<String>>{};
       final senders = <String, PeerKeys?>{};
@@ -124,6 +146,7 @@ class SyncEngine {
           final messageId = outcome.deliveredMessageId;
           if (chatId != null && messageId != null) {
             delivered.putIfAbsent(chatId, () => []).add(messageId);
+            received++;
           }
         }
       } finally {
@@ -131,8 +154,9 @@ class SyncEngine {
         // Delete from the server only what is safely stored on this phone.
         if (handled.isNotEmpty) await relay.acknowledge(handled);
       }
-      if (batch.length < 100) return;
+      if (batch.length < 100) return received;
     }
+    return received;
   }
 
   /// A peer whose messages could not be decrypted gets a fresh session and a
@@ -183,8 +207,9 @@ class SyncEngine {
         await db.transaction(() async {
           await db.removeOutbox(entry.id);
           final messageId = entry.messageId;
-          if (messageId != null) {
-            final row = await (db.select(db.messages)..where((m) => m.id.equals(messageId))).getSingleOrNull();
+          // A photo is "sent" once its last part has left the phone.
+          if (messageId != null && !await db.hasOutboxFor(messageId)) {
+            final row = await db.messageById(messageId);
             if (row != null && parseStatus(row.status) == MessageStatus.pending) {
               await db.setStatus(messageId, MessageStatus.sent);
             }

@@ -58,6 +58,8 @@ class SessionController extends Notifier<SessionState> {
         return result;
     }
     unawaited(ref.read(runtimeProvider).syncNow());
+    // Android 13+: ask once for permission to show new-message alerts.
+    unawaited(services.notifications.requestPermission());
     return result;
   }
 
@@ -66,6 +68,7 @@ class SessionController extends Notifier<SessionState> {
   void finishOnboarding() {
     state = const SessionState(AppPhase.unlocked, UnlockMode.normal);
     unawaited(ref.read(runtimeProvider).start());
+    unawaited(ref.read(servicesProvider).notifications.requestPermission());
   }
 
   /// Password reset finished: new passwords are set. The reset signed this

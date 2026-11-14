@@ -3,47 +3,17 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../../core/env.dart';
 import '../../core/log.dart';
-
-const _channelId = 'bvm_messages';
-const _notificationId = 1;
+import 'notifications.dart';
 
 /// FCM background entry point. The push carries no content (`{"t":"wake"}`);
 /// the phone only shows a generic "New message" notification. Nothing is
 /// fetched or decrypted here, the app does that when it is opened.
 @pragma('vm:entry-point')
 Future<void> bvmFirebaseBackgroundHandler(RemoteMessage message) async {
-  await showGenericMessageNotification();
-}
-
-/// "BVM - New message". No sender, no preview, hidden on the lock screen.
-Future<void> showGenericMessageNotification() async {
-  final plugin = FlutterLocalNotificationsPlugin();
-  await plugin.initialize(
-    settings: const InitializationSettings(
-      android: AndroidInitializationSettings('@drawable/ic_stat_bvm'),
-    ),
-  );
-  await plugin.show(
-    id: _notificationId,
-    title: 'BVM',
-    body: 'New message',
-    notificationDetails: const NotificationDetails(
-      android: AndroidNotificationDetails(
-        _channelId,
-        'Messages',
-        channelDescription: 'New-message alerts. They never contain message content.',
-        importance: Importance.high,
-        priority: Priority.high,
-        visibility: NotificationVisibility.secret,
-        category: AndroidNotificationCategory.message,
-        icon: '@drawable/ic_stat_bvm',
-      ),
-    ),
-  );
+  await showNewMessageNotification();
 }
 
 /// Optional push: active only when the build was configured with a Firebase
@@ -77,14 +47,6 @@ class PushService {
       _initialized = true;
     } on Object catch (e) {
       logDebug('push: unavailable (${e.runtimeType})');
-    }
-  }
-
-  Future<void> clearNotifications() async {
-    try {
-      await FlutterLocalNotificationsPlugin().cancelAll();
-    } on Object {
-      // Not initialized yet: nothing to clear.
     }
   }
 

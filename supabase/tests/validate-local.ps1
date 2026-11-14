@@ -44,16 +44,20 @@ try {
     Write-Host '==> Supabase stubs'
     Invoke-Psql 'bvm' @('-f', (Join-Path $PSScriptRoot 'local_stubs.sql'))
 
-    $migration = Get-Content -Raw (Join-Path $repo 'supabase\migrations\20261031000000_bvm_init.sql')
+    # Every migration in order, concatenated (Supabase applies them the same way).
+    $migration = (Get-ChildItem (Join-Path $repo 'supabase\migrations') -Filter '*.sql' | Sort-Object Name |
+        ForEach-Object { Get-Content -Raw $_.FullName }) -join "`n"
     $migration = $migration -replace '(?m)^create extension if not exists (supabase_vault|pg_cron)[^;]*;', '-- skipped locally: $0'
     $tmp = "$data.migration.sql"
     [System.IO.File]::WriteAllText($tmp, $migration, (New-Object System.Text.UTF8Encoding($false)))
-    Write-Host '==> migration (first run)'
+    Write-Host '==> migrations (first run)'
     Invoke-Psql 'bvm' @('-f', $tmp)
-    Write-Host '==> migration (second run, must be re-runnable)'
+    Write-Host '==> migrations (second run, must be re-runnable)'
     Invoke-Psql 'bvm' @('-f', $tmp)
     Write-Host '==> RLS / RPC checks'
     Invoke-Psql 'bvm' @('-f', (Join-Path $PSScriptRoot 'rls_test.sql'))
+    Write-Host '==> v2 checks'
+    Invoke-Psql 'bvm' @('-f', (Join-Path $PSScriptRoot 'rls_v2_test.sql'))
 } catch {
     $failed = $_.Exception.Message
 } finally {

@@ -40,8 +40,15 @@ dependencies:
   firebase_messaging: ^17.0.1
   flutter_local_notifications: ^22.3.3
 
-  # Background auto-delete sweep while the app is closed.
+  # Background auto-delete sweep and new-message check while the app is closed.
   workmanager: ^0.10.10
+  # Plain HTTPS call for the background new-message check (no login session).
+  http: ^1.6.0
+
+  # Photos: the system photo picker / camera, then pure-Dart re-encoding that
+  # strips EXIF (location) metadata and shrinks the file before encryption.
+  image_picker: ^1.2.4
+  image: ^4.13.0
 
 dev_dependencies:
   flutter_test:

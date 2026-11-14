@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app/app_runtime.dart';
@@ -33,8 +35,20 @@ final messagesProvider = StreamProvider.autoDispose.family<List<Message>, String
   return services.db.watchMessages(chatId, now: services.clock.nowMs);
 });
 
-final usernameProvider = FutureProvider<String?>(
-  (ref) => ref.watch(servicesProvider).account.username(),
+/// Own username; updates after a change.
+final usernameProvider = StreamProvider<String?>(
+  (ref) => ref.watch(servicesProvider).db.watchValue('self.username'),
+);
+
+/// Profile picture bytes of a peer (their user id) or of this user
+/// ([selfAvatarId]); null when there is none.
+final avatarProvider = StreamProvider.autoDispose.family<Uint8List?, String>(
+  (ref, ownerId) => ref.watch(servicesProvider).db.watchAvatar(ownerId),
+);
+
+/// JPEG of a photo message.
+final mediaProvider = FutureProvider.autoDispose.family<MediaItem?, String>(
+  (ref, messageId) => ref.watch(servicesProvider).db.mediaOf(messageId),
 );
 
 /// True once the server reported that the account moved to another phone.

@@ -15,7 +15,7 @@ enum UnlockResult {
 enum UnlockMode { normal, duress }
 
 /// Kind of a locally stored chat item.
-enum MessageKind { text, system }
+enum MessageKind { text, image, system }
 
 /// Delivery state.
 ///
