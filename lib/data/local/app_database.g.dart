@@ -173,6 +173,17 @@ class $ChatsTable extends Chats with TableInfo<$ChatsTable, Chat> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _peerDisplayNameMeta = const VerificationMeta(
+    'peerDisplayName',
+  );
+  @override
+  late final GeneratedColumn<String> peerDisplayName = GeneratedColumn<String>(
+    'peer_display_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     peerId,
@@ -189,6 +200,7 @@ class $ChatsTable extends Chats with TableInfo<$ChatsTable, Chat> {
     profileSentVersion,
     refreshProfile,
     directoryCheckedAt,
+    peerDisplayName,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -328,6 +340,15 @@ class $ChatsTable extends Chats with TableInfo<$ChatsTable, Chat> {
         ),
       );
     }
+    if (data.containsKey('peer_display_name')) {
+      context.handle(
+        _peerDisplayNameMeta,
+        peerDisplayName.isAcceptableOrUnknown(
+          data['peer_display_name']!,
+          _peerDisplayNameMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -393,6 +414,10 @@ class $ChatsTable extends Chats with TableInfo<$ChatsTable, Chat> {
         DriftSqlType.int,
         data['${effectivePrefix}directory_checked_at'],
       )!,
+      peerDisplayName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}peer_display_name'],
+      ),
     );
   }
 
@@ -436,6 +461,10 @@ class Chat extends DataClass implements Insertable<Chat> {
 
   /// Last time the peer's username was checked against the directory.
   final int directoryCheckedAt;
+
+  /// Name the peer chose to show (from their encrypted profile); null = use
+  /// the username.
+  final String? peerDisplayName;
   const Chat({
     required this.peerId,
     required this.peerUsername,
@@ -451,6 +480,7 @@ class Chat extends DataClass implements Insertable<Chat> {
     required this.profileSentVersion,
     required this.refreshProfile,
     required this.directoryCheckedAt,
+    this.peerDisplayName,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -473,6 +503,9 @@ class Chat extends DataClass implements Insertable<Chat> {
     map['profile_sent_version'] = Variable<int>(profileSentVersion);
     map['refresh_profile'] = Variable<bool>(refreshProfile);
     map['directory_checked_at'] = Variable<int>(directoryCheckedAt);
+    if (!nullToAbsent || peerDisplayName != null) {
+      map['peer_display_name'] = Variable<String>(peerDisplayName);
+    }
     return map;
   }
 
@@ -496,6 +529,9 @@ class Chat extends DataClass implements Insertable<Chat> {
       profileSentVersion: Value(profileSentVersion),
       refreshProfile: Value(refreshProfile),
       directoryCheckedAt: Value(directoryCheckedAt),
+      peerDisplayName: peerDisplayName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(peerDisplayName),
     );
   }
 
@@ -519,6 +555,7 @@ class Chat extends DataClass implements Insertable<Chat> {
       profileSentVersion: serializer.fromJson<int>(json['profileSentVersion']),
       refreshProfile: serializer.fromJson<bool>(json['refreshProfile']),
       directoryCheckedAt: serializer.fromJson<int>(json['directoryCheckedAt']),
+      peerDisplayName: serializer.fromJson<String?>(json['peerDisplayName']),
     );
   }
   @override
@@ -539,6 +576,7 @@ class Chat extends DataClass implements Insertable<Chat> {
       'profileSentVersion': serializer.toJson<int>(profileSentVersion),
       'refreshProfile': serializer.toJson<bool>(refreshProfile),
       'directoryCheckedAt': serializer.toJson<int>(directoryCheckedAt),
+      'peerDisplayName': serializer.toJson<String?>(peerDisplayName),
     };
   }
 
@@ -557,6 +595,7 @@ class Chat extends DataClass implements Insertable<Chat> {
     int? profileSentVersion,
     bool? refreshProfile,
     int? directoryCheckedAt,
+    Value<String?> peerDisplayName = const Value.absent(),
   }) => Chat(
     peerId: peerId ?? this.peerId,
     peerUsername: peerUsername ?? this.peerUsername,
@@ -572,6 +611,9 @@ class Chat extends DataClass implements Insertable<Chat> {
     profileSentVersion: profileSentVersion ?? this.profileSentVersion,
     refreshProfile: refreshProfile ?? this.refreshProfile,
     directoryCheckedAt: directoryCheckedAt ?? this.directoryCheckedAt,
+    peerDisplayName: peerDisplayName.present
+        ? peerDisplayName.value
+        : this.peerDisplayName,
   );
   Chat copyWithCompanion(ChatsCompanion data) {
     return Chat(
@@ -609,6 +651,9 @@ class Chat extends DataClass implements Insertable<Chat> {
       directoryCheckedAt: data.directoryCheckedAt.present
           ? data.directoryCheckedAt.value
           : this.directoryCheckedAt,
+      peerDisplayName: data.peerDisplayName.present
+          ? data.peerDisplayName.value
+          : this.peerDisplayName,
     );
   }
 
@@ -628,7 +673,8 @@ class Chat extends DataClass implements Insertable<Chat> {
           ..write('accepted: $accepted, ')
           ..write('profileSentVersion: $profileSentVersion, ')
           ..write('refreshProfile: $refreshProfile, ')
-          ..write('directoryCheckedAt: $directoryCheckedAt')
+          ..write('directoryCheckedAt: $directoryCheckedAt, ')
+          ..write('peerDisplayName: $peerDisplayName')
           ..write(')'))
         .toString();
   }
@@ -649,6 +695,7 @@ class Chat extends DataClass implements Insertable<Chat> {
     profileSentVersion,
     refreshProfile,
     directoryCheckedAt,
+    peerDisplayName,
   );
   @override
   bool operator ==(Object other) =>
@@ -667,7 +714,8 @@ class Chat extends DataClass implements Insertable<Chat> {
           other.accepted == this.accepted &&
           other.profileSentVersion == this.profileSentVersion &&
           other.refreshProfile == this.refreshProfile &&
-          other.directoryCheckedAt == this.directoryCheckedAt);
+          other.directoryCheckedAt == this.directoryCheckedAt &&
+          other.peerDisplayName == this.peerDisplayName);
 }
 
 class ChatsCompanion extends UpdateCompanion<Chat> {
@@ -685,6 +733,7 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
   final Value<int> profileSentVersion;
   final Value<bool> refreshProfile;
   final Value<int> directoryCheckedAt;
+  final Value<String?> peerDisplayName;
   final Value<int> rowid;
   const ChatsCompanion({
     this.peerId = const Value.absent(),
@@ -701,6 +750,7 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
     this.profileSentVersion = const Value.absent(),
     this.refreshProfile = const Value.absent(),
     this.directoryCheckedAt = const Value.absent(),
+    this.peerDisplayName = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ChatsCompanion.insert({
@@ -718,6 +768,7 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
     this.profileSentVersion = const Value.absent(),
     this.refreshProfile = const Value.absent(),
     this.directoryCheckedAt = const Value.absent(),
+    this.peerDisplayName = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : peerId = Value(peerId),
        peerUsername = Value(peerUsername),
@@ -740,6 +791,7 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
     Expression<int>? profileSentVersion,
     Expression<bool>? refreshProfile,
     Expression<int>? directoryCheckedAt,
+    Expression<String>? peerDisplayName,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -759,6 +811,7 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
       if (refreshProfile != null) 'refresh_profile': refreshProfile,
       if (directoryCheckedAt != null)
         'directory_checked_at': directoryCheckedAt,
+      if (peerDisplayName != null) 'peer_display_name': peerDisplayName,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -778,6 +831,7 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
     Value<int>? profileSentVersion,
     Value<bool>? refreshProfile,
     Value<int>? directoryCheckedAt,
+    Value<String?>? peerDisplayName,
     Value<int>? rowid,
   }) {
     return ChatsCompanion(
@@ -795,6 +849,7 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
       profileSentVersion: profileSentVersion ?? this.profileSentVersion,
       refreshProfile: refreshProfile ?? this.refreshProfile,
       directoryCheckedAt: directoryCheckedAt ?? this.directoryCheckedAt,
+      peerDisplayName: peerDisplayName ?? this.peerDisplayName,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -844,6 +899,9 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
     if (directoryCheckedAt.present) {
       map['directory_checked_at'] = Variable<int>(directoryCheckedAt.value);
     }
+    if (peerDisplayName.present) {
+      map['peer_display_name'] = Variable<String>(peerDisplayName.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -867,6 +925,7 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
           ..write('profileSentVersion: $profileSentVersion, ')
           ..write('refreshProfile: $refreshProfile, ')
           ..write('directoryCheckedAt: $directoryCheckedAt, ')
+          ..write('peerDisplayName: $peerDisplayName, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4345,6 +4404,7 @@ typedef $$ChatsTableCreateCompanionBuilder = ChatsCompanion Function({
   Value<int> profileSentVersion,
   Value<bool> refreshProfile,
   Value<int> directoryCheckedAt,
+  Value<String?> peerDisplayName,
   Value<int> rowid,
 });
 typedef $$ChatsTableUpdateCompanionBuilder = ChatsCompanion Function({
@@ -4362,6 +4422,7 @@ typedef $$ChatsTableUpdateCompanionBuilder = ChatsCompanion Function({
   Value<int> profileSentVersion,
   Value<bool> refreshProfile,
   Value<int> directoryCheckedAt,
+  Value<String?> peerDisplayName,
   Value<int> rowid,
 });
 
@@ -4463,6 +4524,11 @@ class $$ChatsTableFilterComposer extends Composer<_$AppDatabase, $ChatsTable> {
 
   ColumnFilters<int> get directoryCheckedAt => $composableBuilder(
     column: $table.directoryCheckedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get peerDisplayName => $composableBuilder(
+    column: $table.peerDisplayName,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4570,6 +4636,11 @@ class $$ChatsTableOrderingComposer
     column: $table.directoryCheckedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get peerDisplayName => $composableBuilder(
+    column: $table.peerDisplayName,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ChatsTableAnnotationComposer
@@ -4643,6 +4714,11 @@ class $$ChatsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get peerDisplayName => $composableBuilder(
+    column: $table.peerDisplayName,
+    builder: (column) => column,
+  );
+
   Expression<T> messagesRefs<T extends Object>(
     Expression<T> Function($$MessagesTableAnnotationComposer a) f,
   ) {
@@ -4711,6 +4787,7 @@ class $$ChatsTableTableManager
                 Value<int> profileSentVersion = const Value.absent(),
                 Value<bool> refreshProfile = const Value.absent(),
                 Value<int> directoryCheckedAt = const Value.absent(),
+                Value<String?> peerDisplayName = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ChatsCompanion(
                 peerId: peerId,
@@ -4727,6 +4804,7 @@ class $$ChatsTableTableManager
                 profileSentVersion: profileSentVersion,
                 refreshProfile: refreshProfile,
                 directoryCheckedAt: directoryCheckedAt,
+                peerDisplayName: peerDisplayName,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4745,6 +4823,7 @@ class $$ChatsTableTableManager
                 Value<int> profileSentVersion = const Value.absent(),
                 Value<bool> refreshProfile = const Value.absent(),
                 Value<int> directoryCheckedAt = const Value.absent(),
+                Value<String?> peerDisplayName = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ChatsCompanion.insert(
                 peerId: peerId,
@@ -4761,6 +4840,7 @@ class $$ChatsTableTableManager
                 profileSentVersion: profileSentVersion,
                 refreshProfile: refreshProfile,
                 directoryCheckedAt: directoryCheckedAt,
+                peerDisplayName: peerDisplayName,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

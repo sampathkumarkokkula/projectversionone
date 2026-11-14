@@ -60,6 +60,49 @@ Future<void> editAvatar(BuildContext context, WidgetRef ref) async {
 Future<void> changeUsernameDialog(BuildContext context, WidgetRef ref, String current) =>
     showDialog<void>(context: context, builder: (_) => _UsernameDialog(current: current));
 
+Future<void> changeDisplayNameDialog(BuildContext context, WidgetRef ref, String current) async {
+  final controller = TextEditingController(text: current);
+  try {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Your name'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'People you chat with see this name, with your username next to it. '
+              'It is sent end-to-end encrypted; the server never sees it. Leave it empty to show '
+              'your username.',
+            ),
+            const SizedBox(height: 12),
+            PrivateTextField(
+              controller: controller,
+              label: 'Name',
+              autofocus: true,
+              maxLength: 40,
+              textCapitalization: TextCapitalization.words,
+              onSubmitted: (value) => Navigator.of(dialogContext).pop(value),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(controller.text), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (result == null) return;
+    await ref.read(servicesProvider).account.setDisplayName(result);
+    unawaited(ref.read(runtimeProvider).syncNow());
+  } on Object catch (e) {
+    if (context.mounted) showSnack(context, describeError(e));
+  } finally {
+    controller.dispose();
+  }
+}
+
 class _UsernameDialog extends ConsumerStatefulWidget {
   const _UsernameDialog({required this.current});
 

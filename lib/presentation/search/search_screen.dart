@@ -99,9 +99,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   itemBuilder: (context, i) {
                     final hit = _hits[i];
                     return ListTile(
-                      leading: AvatarCircle(ownerId: hit.chat.peerId, name: hit.chat.peerUsername),
+                      leading: AvatarCircle(ownerId: hit.chat.peerId, name: hit.chat.name),
                       title: Text(
-                        hit.message.fromMe ? 'You → ${hit.chat.peerUsername}' : hit.chat.peerUsername,
+                        hit.message.fromMe ? 'You → ${hit.chat.name}' : hit.chat.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),

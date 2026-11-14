@@ -115,7 +115,8 @@ from a peer's message, so a peer cannot pose as someone else.
 ## 3. The app lock (main and secondary password)
 
 * The server authenticates the device session with an e-mail one-time code.
-  The two passwords are a purely local lock and never leave the phone.
+  The two passwords are a local lock and never leave the phone; only the
+  encrypted account backup (section 3, "Account backup") is derived from them.
 * Both passwords are stored as Argon2id verifiers (PHC strings, 16-byte random
   salt, 19 MiB, 2 passes, 1 lane = the OWASP recommendation) via the pure-Dart
   `hashlib` package, checked against RFC 9106 vectors upstream. The parameters
@@ -164,6 +165,39 @@ Before anything else, "Forgot password" permanently deletes every chat that has
 an auto-delete timer on this phone (local only, no relay), so a reset cannot be
 used to get around the secondary password. Then the account e-mail receives a
 one-time code, and new passwords are set.
+
+### Account backup (v3)
+
+So that a new or reinstalled phone keeps the passwords and the contact list,
+the phone uploads an encrypted backup to `private.account_backups` (RPCs
+`put_account_backup`, which requires the current device key, and
+`get_account_backup`, own row only).
+
+* **Content:** both Argon2id lock verifiers, both backup slot keys, the
+  display name, the own profile picture and the contact list (user id,
+  username, display name, timer, block flag). **Never messages, session keys
+  or Olm identity keys.** The JSON is padded to a multiple of 8 KB.
+* **Encryption:** AES-256-GCM (`package:cryptography`), key = Argon2id(password,
+  16-byte random salt, 32 MiB, 3 passes, 1 lane). Two copies are stored, one
+  under the main password and one under the secondary password; without a
+  secondary password, that copy uses a random 256-bit key nobody knows. The
+  copies have the same size and are stored in random order, so the server
+  cannot tell which is which or whether a secondary password exists.
+* **Restore:** after the e-mail code, the new phone asks for the existing app
+  password and tries it on both copies. The main password restores normally.
+  The secondary password restores the same content and then runs the duress
+  wipe (section "Secondary password"), so the peers' copies of timer chats are
+  deleted as on a normal duress unlock. The phone creates new Olm keys, and
+  each restored contact gets a fresh session plus a content-free hello, so
+  their next message is encrypted for the new phone.
+* The backup is re-uploaded when its content changes (checked on each sync,
+  compared by hash). Installs from before v3 get their backup key on the next
+  unlock; until the secondary password is used or set again, the secondary
+  copy uses a random key.
+* **Trade-off:** whoever holds the database (the operator, or an attacker who
+  breaches it) can try to guess the app password offline against the backup,
+  at the Argon2id cost per guess. A strong password matters more than before.
+  "Start fresh" ignores the backup and replaces it with the new one.
 
 ## 4. Auto-delete timers
 
@@ -220,7 +254,11 @@ one-time code, and new passwords are set.
 * Dart strings (typed passwords, decrypted text in memory) cannot be wiped
   reliably from memory.
 * One phone per account. Signing in on a new phone creates new keys; history
-  never moves and contacts see a security-code change.
+  never moves and contacts see a security-code change ("X signed in again or
+  moved to a new phone"). The account backup restores passwords and contacts,
+  not messages.
+* Display names are chosen freely and are not unique. The UI always shows the
+  username next to a display name; the safety number is the real check.
 * Username lookups and one-time-key claims are not rate limited yet; key
   claiming can be used to exhaust one-time keys (the fallback key keeps
   sessions possible).

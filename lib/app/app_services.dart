@@ -19,6 +19,7 @@ import '../domain/session_establisher.dart';
 import '../domain/sync_engine.dart';
 import '../domain/wipe_service.dart';
 import 'account_service.dart';
+import 'backup_service.dart';
 import 'chat_actions.dart';
 
 /// Composition root: every long-lived service, wired once at start-up.
@@ -39,6 +40,7 @@ class AppServices {
     required this.chatActions,
     required this.push,
     required this.notifications,
+    required this.backup,
     required this.clock,
   });
 
@@ -52,9 +54,11 @@ class AppServices {
     final ids = UuidV4Generator();
     final crypto = OlmCrypto(db: db, pickleKey: pickleKey, clock: clock);
     final backend = SupabaseBackend(client, deviceKey: crypto.identityKey);
-    final lock = LockService(settings: db, hasher: const Argon2idHasher(), clock: clock);
     final outbound = Outbound(db: db, crypto: crypto, clock: clock, ids: ids);
     final messages = MessageService(db: db, crypto: crypto, outbound: outbound, clock: clock, ids: ids);
+    final backup = BackupService(db: db, backend: backend, messages: messages);
+    final lock = LockService(settings: db, hasher: const Argon2idHasher(), clock: clock, slotKeys: backup);
+    backup.lock = lock;
     final sessions = SessionEstablisher(db: db, directory: backend, crypto: crypto, messages: messages);
     final wipe = WipeService(db: db, outbound: outbound, clock: clock);
     final sweeper = ExpirySweeper(db: db, clock: clock);
@@ -75,8 +79,10 @@ class AppServices {
       db: db,
       keyStore: keyStore,
       messages: messages,
+      backup: backup,
     );
     return AppServices._(
+      backup: backup,
       keyStore: keyStore,
       db: db,
       backend: backend,
@@ -111,5 +117,6 @@ class AppServices {
   final ChatActions chatActions;
   final PushService push;
   final Notifications notifications;
+  final BackupService backup;
   final Clock clock;
 }

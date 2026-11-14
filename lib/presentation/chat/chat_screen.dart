@@ -252,15 +252,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final timer = chat?.timerSeconds;
     final blocked = chat?.blocked ?? false;
     final canSend = chat != null && !replaced && !blocked;
+    // The username always shows next to the self-chosen name, so a contact
+    // cannot pass themselves off as someone else by picking their name.
     final subtitle = chat == null
         ? null
-        : blocked
-            ? 'Blocked'
-            : !chat.accepted
-                ? 'Message request'
-                : timer != null
-                    ? 'Auto-delete: ${timerLabel(timer)}'
-                    : null;
+        : [
+            '@${chat.peerUsername}',
+            if (blocked)
+              'Blocked'
+            else if (!chat.accepted)
+              'Message request'
+            else if (timer != null)
+              'Auto-delete: ${timerLabel(timer)}',
+          ].join(' · ');
 
     final rows = messages.value;
     if (_focusPending && rows != null && _highlightId != null) {
@@ -280,13 +284,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 ),
                 child: Row(
                   children: [
-                    AvatarCircle(ownerId: chat.peerId, name: chat.peerUsername, radius: 18),
+                    AvatarCircle(ownerId: chat.peerId, name: chat.name, radius: 18),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(chat.peerUsername, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          Text(chat.name, maxLines: 1, overflow: TextOverflow.ellipsis),
                           if (subtitle != null) Text(subtitle, style: Theme.of(context).textTheme.labelSmall),
                         ],
                       ),
@@ -308,7 +312,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         children: [
           if (chat != null && blocked)
             MaterialBanner(
-              content: Text('You blocked ${chat.peerUsername}. They cannot send you messages.'),
+              content: Text('You blocked ${chat.name}. They cannot send you messages.'),
               actions: [
                 TextButton(onPressed: () => unblockWithConfirm(context, ref, chat), child: const Text('Unblock')),
               ],
@@ -316,7 +320,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           else if (chat != null && !chat.accepted)
             MaterialBanner(
               content: Text(
-                '${chat.peerUsername} is not in your chats. They won\'t see that you read their '
+                '${chat.name} (@${chat.peerUsername}) is not in your chats. They won\'t see that you read their '
                 'messages or your profile picture until you accept.',
               ),
               actions: [
@@ -372,7 +376,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           if (_replyTo != null && canSend)
             _ReplyPreview(
               message: _replyTo!,
-              peerName: chat.peerUsername,
+              peerName: chat.name,
               onCancel: () => setState(() => _replyTo = null),
             ),
           SafeArea(

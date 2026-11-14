@@ -30,6 +30,7 @@ your messages.
 | Spam reports | Suspending accounts that several people report | Who reported whom and when; contains no messages | Until either account is deleted |
 | Banned e-mail addresses | Keeping suspended spammers and throw-away addresses out | Only a SHA-256 hash of the address, plus a list of banned domains | Indefinitely |
 | Inbox token | Letting your phone ask "are messages waiting?" for notifications while the app is closed | Only a hash of a random token; the check (about every 15 minutes) reveals to our provider's logs that your phone is online | Until you move to another phone or delete your account |
+| Encrypted account backup | Keeping your app passwords, name, profile picture and contact list when you sign in on a new phone | Encrypted on your phone with a key derived from your app password; we cannot read it. Contains no messages | Until you delete your account (replaced on every change) |
 | Push address (Firebase Installation ID) | Waking the recipient's phone with a "you have a message" signal that contains no content | Not visible to other users | Until you delete your account |
 
 Our infrastructure providers process technical data such as IP addresses and
@@ -45,7 +46,10 @@ sign-in, message relay) and Google Firebase Cloud Messaging (push signal).
 - Online status or "last seen".
 - Analytics, advertising identifiers or tracking.
 - Your app passwords. Both the main and the optional secondary password are
-  checked on your phone only and are never sent to us.
+  checked on your phone only and are never sent to us (the account backup is
+  locked with them on your phone before upload).
+- Your display name in readable form. It is sent end-to-end encrypted to the
+  people you chat with, and stored only inside the encrypted backup.
 
 ## Data on your phone
 

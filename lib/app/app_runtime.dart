@@ -71,11 +71,13 @@ class AppRuntime {
       onToken: (token) async {
         try {
           await _s.backend.setPushToken(token);
+          return true;
         } on DeviceReplacedException {
           await _enterReplacedMode();
         } on Object {
           logDebug('push: token upload failed');
         }
+        return false;
       },
       onWake: () => unawaited(syncNow()),
     );
@@ -115,6 +117,9 @@ class AppRuntime {
     if (!_started || _replaced || _s.backend.userId == null) return;
     try {
       await _s.sync.sync();
+      // Keeps the encrypted contact/password backup current (uploads only
+      // when something changed).
+      await _s.backup.uploadIfChanged();
     } on DeviceReplacedException {
       await _enterReplacedMode();
     } on Object {

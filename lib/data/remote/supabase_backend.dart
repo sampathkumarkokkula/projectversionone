@@ -162,6 +162,23 @@ class SupabaseBackend implements RelayApi, DirectoryApi {
   Future<void> setPushToken(String? token) async =>
       _rpc('set_push_token', {'p_device_key': await _deviceKey(), 'p_token': token});
 
+  /// Stores the two encrypted backup copies (only the current phone may).
+  Future<void> putAccountBackup(String copyA, String copyB) async => _rpc('put_account_backup', {
+        'p_device_key': await _deviceKey(),
+        'p_copy_a': copyA,
+        'p_copy_b': copyB,
+      });
+
+  /// The two encrypted backup copies, or null when the account has none.
+  Future<List<String>?> getAccountBackup() async {
+    final rows = _rows(await _rpc('get_account_backup'));
+    if (rows.isEmpty) return null;
+    final a = rows.first['copy_a'];
+    final b = rows.first['copy_b'];
+    if (a is! String || b is! String) return null;
+    return [a, b];
+  }
+
   /// Registers the random token the background task uses to ask whether new
   /// messages are waiting (see BackgroundTasks).
   Future<void> setInboxToken(String token) async =>

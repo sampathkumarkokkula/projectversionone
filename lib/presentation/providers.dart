@@ -40,6 +40,11 @@ final usernameProvider = StreamProvider<String?>(
   (ref) => ref.watch(servicesProvider).db.watchValue('self.username'),
 );
 
+/// Own display name (null = none set).
+final displayNameProvider = StreamProvider<String?>(
+  (ref) => ref.watch(servicesProvider).db.watchValue(selfDisplayNameKey),
+);
+
 /// Profile picture bytes of a peer (their user id) or of this user
 /// ([selfAvatarId]); null when there is none.
 final avatarProvider = StreamProvider.autoDispose.family<Uint8List?, String>(

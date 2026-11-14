@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/local/app_database.dart' show ChatNames;
 import '../../domain/safety_number.dart';
 import '../../domain/timer_policy.dart';
 import '../providers.dart';
@@ -34,9 +35,10 @@ class ChatInfoScreen extends ConsumerWidget {
           : ListView(
               padding: const EdgeInsets.symmetric(vertical: 16),
               children: [
-                Center(child: AvatarCircle(ownerId: chat.peerId, name: chat.peerUsername, radius: 48)),
+                Center(child: AvatarCircle(ownerId: chat.peerId, name: chat.name, radius: 48)),
                 const SizedBox(height: 12),
-                Text(chat.peerUsername, textAlign: TextAlign.center, style: text.headlineSmall),
+                Text(chat.name, textAlign: TextAlign.center, style: text.headlineSmall),
+                Text('@${chat.peerUsername}', textAlign: TextAlign.center, style: text.bodyMedium),
                 if (chat.blocked)
                   Text('Blocked', textAlign: TextAlign.center, style: TextStyle(color: scheme.error))
                 else if (!chat.accepted)
@@ -58,7 +60,7 @@ class ChatInfoScreen extends ConsumerWidget {
                       Text('Safety number', style: text.titleMedium),
                       const SizedBox(height: 8),
                       Text(
-                        'Compare this number with ${chat.peerUsername}, in person or on a call. '
+                        'Compare this number with ${chat.name}, in person or on a call. '
                         'If it matches on both phones, nobody is intercepting your messages.',
                         style: text.bodySmall,
                       ),
@@ -78,13 +80,13 @@ class ChatInfoScreen extends ConsumerWidget {
                   if (chat.blocked)
                     ListTile(
                       leading: const Icon(Icons.lock_open_outlined),
-                      title: Text('Unblock ${chat.peerUsername}'),
+                      title: Text('Unblock ${chat.name}'),
                       onTap: () => unblockWithConfirm(context, ref, chat),
                     )
                   else
                     ListTile(
                       leading: Icon(Icons.block, color: scheme.error),
-                      title: Text('Block ${chat.peerUsername}', style: TextStyle(color: scheme.error)),
+                      title: Text('Block ${chat.name}', style: TextStyle(color: scheme.error)),
                       onTap: () => blockWithConfirm(context, ref, chat),
                     ),
                   ListTile(

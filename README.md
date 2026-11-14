@@ -25,6 +25,7 @@ Status: **milestone M1 (release APK), feature update v2**. See
 | Feature | How it works |
 |---|---|
 | Username | Unique, 3-24 characters `a-z 0-9 _`. The only way people find you (exact match, no browsing). **Can be changed** in Settings, once every 24 hours; contacts see "old is now new". Reserved names (admin, support, bvm, ...) are refused. |
+| Display name | Optional, up to 40 characters, set at registration or in Settings > Name. Chats show it instead of the username; the username is always shown next to it (`@name`) so nobody can pose as someone else. Sent end-to-end encrypted to your chats only; the server never stores it. |
 | Profile picture | Settings > tap the picture. Cropped square, 256 px, about 24 KB, no metadata. Sent end-to-end encrypted **only to people you chat with** (not to message requests or blocked users); the server never stores it. |
 | Phone number and e-mail | Collected at registration, never shown to anyone. Phone is stored encrypted; e-mail is used for one-time sign-in codes. |
 
@@ -52,6 +53,7 @@ Status: **milestone M1 (release APK), feature update v2**. See
 | App open in the background | Alert as soon as the message arrives (Realtime). |
 | App closed | A background task asks the server every ~15 minutes, with a random per-phone token and no login session, whether messages wait. Android may delay it in battery saving. |
 | Instant alerts when closed (optional) | Configure Firebase Cloud Messaging (section 3, about 10 minutes, free); the push carries no content. |
+| Push diagnostics | Settings > Notifications shows whether instant push is in this build, registered or failed (with the error), and "Send a test notification" shows a local test alert. No alert is shown while BVM is on screen. |
 
 ### Privacy and the app lock
 | Feature | How it works |
@@ -62,6 +64,7 @@ Status: **milestone M1 (release APK), feature update v2**. See
 | Device hardening | Screenshots and screen recording blocked, blank app-switcher preview, no cloud backup or device transfer, incognito keyboard, no online status or last seen, no contact upload. |
 | Safety number | Chat info shows a 60-digit number to compare in person; key changes are announced in the chat. |
 | One phone per account | Signing in on a new phone moves the account; the old phone stops sending and receiving and can take it back with an e-mail code. |
+| Encrypted account backup | Signing in again (new phone, reinstall) asks for your **existing** app password instead of a new one. It restores both passwords, your name, picture, contact list, timers and blocks; **chat history is never backed up**, so chats come back empty. The phone encrypts the backup with a key derived from your password (Argon2id + AES-256-GCM); the server stores two same-size copies and cannot tell whether a secondary password exists. Restoring with the secondary password behaves like a duress unlock. "Start fresh" skips the backup if you forgot the password. |
 
 ## Costs
 
@@ -148,16 +151,18 @@ Keep the project outside OneDrive (sync corrupts Gradle/Cargo outputs).
 ## 2. Supabase (free tier)
 
 1. Create a project at supabase.com (no card needed).
-2. **Schema:** in the SQL Editor run both migration files, in this order
+2. **Schema:** in the SQL Editor run the three migration files, in this order
    (each: paste > Run):
    1. `supabase/migrations/20261031000000_bvm_init.sql`: tables with RLS, RPCs,
       Realtime publication, 5-minute TTL job, phone-encryption key in Vault.
    2. `supabase/migrations/20261115000000_bvm_v2_features.sql`: username
       changes, blocking, spam reports and suspension, e-mail blocklist, the
       notification inbox check.
+   3. `supabase/migrations/20261116000000_bvm_v3_account_backup.sql`: the
+      encrypted account backup (passwords and contacts survive a new sign-in).
 
-   A project that already ran the first file only needs the second. Both are
-   safe to run again. With the CLI instead: `npx supabase link --project-ref <ref>`
+   A project that already ran the earlier files only needs the newer ones. All
+   are safe to run again. With the CLI instead: `npx supabase link --project-ref <ref>`
    then `npx supabase db push`.
 
    **Optional, recommended:** Authentication > Hooks > *Before User Created* >
@@ -308,11 +313,16 @@ yet; their server side is covered by `rls_v2_test.sql`.
 ## Updating an existing install
 
 1. `git pull`
-2. Run `supabase/migrations/20261115000000_bvm_v2_features.sql` in the SQL
-   Editor (once).
-3. Rebuild: `powershell -ExecutionPolicy Bypass -File scripts\build-apk.ps1 -SkipTests`
+2. Run the migrations you have not run yet in the SQL Editor (once each):
+   `20261115000000_bvm_v2_features.sql`, then
+   `20261116000000_bvm_v3_account_backup.sql`.
+3. Redeploy the Edge Functions (`scripts\deploy-functions.ps1`, add
+   `-ServiceAccount <json>` only to replace the Firebase key).
+4. Rebuild: `powershell -ExecutionPolicy Bypass -File scripts\build-apk.ps1 -SkipTests`
    and install the APK over the old one (same signing key). The local
-   database upgrades itself to schema v2; chats and messages are kept.
+   database upgrades itself to schema v3; chats and messages are kept.
+5. Unlock the app once on each phone: that creates the encrypted account
+   backup. Only after that does a new sign-in restore passwords and contacts.
 
 ## 7. Next milestones
 

@@ -60,13 +60,15 @@ class SessionController extends Notifier<SessionState> {
     unawaited(ref.read(runtimeProvider).syncNow());
     // Android 13+: ask once for permission to show new-message alerts.
     unawaited(services.notifications.requestPermission());
+    // Installs from before account backups: derive this slot's backup key.
+    unawaited(services.backup.onUnlocked(password, state.mode));
     return result;
   }
 
-  /// Registration or new-device sign-in finished: unlocked with the main
-  /// password that was just chosen.
-  void finishOnboarding() {
-    state = const SessionState(AppPhase.unlocked, UnlockMode.normal);
+  /// Registration or new-device sign-in finished. [mode] is duress when a
+  /// backup was restored with the secondary password.
+  void finishOnboarding({UnlockMode mode = UnlockMode.normal}) {
+    state = SessionState(AppPhase.unlocked, mode);
     unawaited(ref.read(runtimeProvider).start());
     unawaited(ref.read(servicesProvider).notifications.requestPermission());
   }

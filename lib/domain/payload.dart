@@ -94,8 +94,13 @@ sealed class Payload {
         case 'profile':
           final version = map['pv'];
           final avatar = map['a'];
+          final name = map['dn'];
           if (version is! int || (avatar != null && avatar is! String)) return const UnknownPayload();
-          return ProfilePayload(version: version, avatarBase64: avatar as String?);
+          return ProfilePayload(
+            version: version,
+            avatarBase64: avatar as String?,
+            displayName: name is String ? name : null,
+          );
         case 'receipt':
           final ids = _stringList(map['ids']);
           final st = map['st'];
@@ -232,12 +237,16 @@ final class ImagePartPayload extends Payload {
 /// the directory, so a changed username shows up without being trusted from
 /// the message itself.
 final class ProfilePayload extends Payload {
-  const ProfilePayload({required this.version, this.avatarBase64});
+  const ProfilePayload({required this.version, this.avatarBase64, this.displayName});
 
   final int version;
 
   /// Base64 JPEG (at most ~24 KB), or null when the picture was removed.
   final String? avatarBase64;
+
+  /// The name the sender wants to be shown as (null = their username). It is
+  /// self-chosen, so the app always shows the username next to it.
+  final String? displayName;
 
   /// Travels as type `receipt`, so the server cannot tell profile updates
   /// apart from read receipts.
@@ -248,7 +257,7 @@ final class ProfilePayload extends Payload {
   String get _kind => 'profile';
 
   @override
-  Map<String, Object?> _fields() => {'pv': version, 'a': avatarBase64};
+  Map<String, Object?> _fields() => {'pv': version, 'a': avatarBase64, 'dn': displayName};
 }
 
 /// Delivery or read receipt for messages the recipient sent.

@@ -32,6 +32,59 @@ class ChatBlockedException implements Exception {
   const ChatBlockedException();
 }
 
+/// Shown when a contact's encryption keys change. Almost always harmless: they
+/// signed in on another phone or reinstalled BVM.
+String securityCodeNotice(String name) =>
+    '$name signed in again or moved to a new phone, so your security code changed. '
+    'Messages stay end-to-end encrypted. To be sure it is really them, compare the '
+    'safety number in Chat info.';
+
+/// One contact from the account backup.
+class BackupChat {
+  const BackupChat({
+    required this.peerId,
+    required this.username,
+    this.displayName,
+    this.timerSeconds,
+    this.timerChangedAt = 0,
+    this.blocked = false,
+  });
+
+  final String peerId;
+  final String username;
+  final String? displayName;
+  final int? timerSeconds;
+  final int timerChangedAt;
+  final bool blocked;
+
+  Map<String, Object?> toJson() => {
+        'id': peerId,
+        'u': username,
+        'n': displayName,
+        't': timerSeconds,
+        'tc': timerChangedAt,
+        'b': blocked,
+      };
+
+  static BackupChat? fromJson(Object? value) {
+    if (value is! Map<String, dynamic>) return null;
+    final id = value['id'];
+    final u = value['u'];
+    if (id is! String || u is! String) return null;
+    final t = value['t'];
+    final tc = value['tc'];
+    final n = value['n'];
+    return BackupChat(
+      peerId: id,
+      username: u,
+      displayName: n is String ? n : null,
+      timerSeconds: t is int ? t : null,
+      timerChangedAt: tc is int ? tc : 0,
+      blocked: value['b'] == true,
+    );
+  }
+}
+
 /// 1-to-1 chat logic on top of the encrypted local database: text and photo
 /// messages, replies, receipts, deletions, auto-delete timers, wipes,
 /// message requests, blocking and profile sharing.
@@ -129,8 +182,7 @@ class MessageService {
           // Nothing more leaves this phone for them.
           await db.dropOutboxFor(chatId, const ['message', 'receipt', 'timer_change']);
         }
-        await _notice(chatId, blocked ? 'You blocked ${chat.peerUsername}.' : 'You unblocked ${chat.peerUsername}.',
-            clock.nowMs());
+        await _notice(chatId, blocked ? 'You blocked ${chat.name}.' : 'You unblocked ${chat.name}.', clock.nowMs());
       });
 
   /// Deletes the chat and everything in it from this phone only. The Olm
@@ -375,7 +427,7 @@ class MessageService {
           peer.userId,
           ChatsCompanion(peerIdentityKey: Value(peer.identityKey), peerSigningKey: Value(peer.signingKey)),
         );
-        await _notice(peer.userId, 'Your security code with ${chat.peerUsername} changed.', now);
+        await _notice(peer.userId, securityCodeNotice(chat.name), now);
         return true;
       });
 
@@ -393,13 +445,15 @@ class MessageService {
   /// the new profile on the next sync.
   Future<void> bumpProfileVersion() async => db.write(_profileVersionKey, '${await profileVersion() + 1}');
 
-  /// Sends the own profile picture to accepted, unblocked chats that have not
-  /// seen the current version (also covers chats started later).
+  /// Sends the own profile (picture and display name) to accepted, unblocked
+  /// chats that have not seen the current version (also covers chats started
+  /// later).
   Future<void> shareProfile() async {
     final version = await profileVersion();
     if (version == 0) return;
     final avatar = await db.avatarOf(selfAvatarId);
     final encoded = avatar == null ? null : base64Encode(avatar);
+    final displayName = cleanDisplayName(await db.read(selfDisplayNameKey));
     final targets = await (db.select(db.chats)
           ..where((c) =>
               c.accepted.equals(true) & c.blocked.equals(false) & c.profileSentVersion.isSmallerThanValue(version)))
@@ -407,7 +461,10 @@ class MessageService {
     for (final chat in targets) {
       if (!await crypto.hasSession(chat.peerId)) continue;
       await db.transaction(() async {
-        await outbound.enqueue(chat.peerId, ProfilePayload(version: version, avatarBase64: encoded));
+        await outbound.enqueue(
+          chat.peerId,
+          ProfilePayload(version: version, avatarBase64: encoded, displayName: displayName),
+        );
         await _updateChat(chat.peerId, ChatsCompanion(profileSentVersion: Value(version)));
       });
     }
@@ -430,7 +487,7 @@ class MessageService {
         final now = clock.nowMs();
         if (entry != null && entry.username != chat.peerUsername) {
           await _updateChat(chat.peerId, ChatsCompanion(peerUsername: Value(entry.username)));
-          await _notice(chat.peerId, '${chat.peerUsername} is now ${entry.username}.', now);
+          await _notice(chat.peerId, '${chat.name} changed their username from @${chat.peerUsername} to @${entry.username}.', now);
         }
         await _updateChat(
           chat.peerId,
@@ -459,6 +516,48 @@ class MessageService {
         if (!r.key.startsWith('repair.last.')) r.key.substring('repair.'.length),
     ];
   }
+
+  /// Asks the next sync to set up a fresh session and send a content-free
+  /// hello, so the peer's next message is encrypted for this phone's keys.
+  Future<void> requestSessionRepair(String peerId) => db.write(_repairKey(peerId), '${clock.nowMs()}');
+
+  // ---------------------------------------------------------------------------
+  // Account backup (contact list only, never messages)
+  // ---------------------------------------------------------------------------
+
+  Future<List<BackupChat>> backupChats() async => [
+        for (final c in await (db.select(db.chats)..orderBy([(c) => OrderingTerm.asc(c.peerId)])).get())
+          BackupChat(
+            peerId: c.peerId,
+            username: c.peerUsername,
+            displayName: c.peerDisplayName,
+            timerSeconds: c.timerSeconds,
+            timerChangedAt: c.timerChangedAt,
+            blocked: c.blocked,
+          ),
+      ];
+
+  /// Re-creates a contact from the backup with an empty conversation. [peer]
+  /// is their current directory entry (fresh keys are pinned).
+  Future<void> restoreChat(BackupChat saved, PeerKeys peer) => db.transaction(() async {
+        if (await db.chatById(peer.userId) != null) return;
+        final now = clock.nowMs();
+        await db.into(db.chats).insert(
+              ChatsCompanion.insert(
+                peerId: peer.userId,
+                peerUsername: peer.username,
+                peerIdentityKey: peer.identityKey,
+                peerSigningKey: peer.signingKey,
+                createdAt: now,
+                lastActivityAt: saved.timerChangedAt > 0 ? saved.timerChangedAt : now,
+                timerSeconds: Value(isAcceptableTimer(saved.timerSeconds) ? saved.timerSeconds : null),
+                timerChangedAt: Value(saved.timerChangedAt),
+                blocked: Value(saved.blocked),
+                peerDisplayName: Value(cleanDisplayName(saved.displayName)),
+                directoryCheckedAt: Value(now),
+              ),
+            );
+      });
 
   Future<void> repairDone(String peerId) async {
     await db.remove(_repairKey(peerId));
@@ -539,7 +638,7 @@ class MessageService {
             env.senderId,
             ChatsCompanion(peerIdentityKey: Value(sender.identityKey), peerSigningKey: Value(sender.signingKey)),
           );
-          await _notice(chat.peerId, 'Your security code with ${chat.peerUsername} changed.', now);
+          await _notice(chat.peerId, securityCodeNotice(chat.name), now);
         }
 
         if (chat.blocked && payload is! DeletePayload && payload is! WipePayload) {
@@ -588,7 +687,11 @@ class MessageService {
       case ImagePartPayload():
         return _applyImagePart(chat, payload, now);
 
-      case ProfilePayload(:final avatarBase64):
+      case ProfilePayload(:final avatarBase64, :final displayName):
+        final name = cleanDisplayName(displayName);
+        if (name != chat.peerDisplayName) {
+          await _updateChat(chat.peerId, ChatsCompanion(peerDisplayName: Value(name)));
+        }
         if (avatarBase64 == null) {
           await db.removeAvatar(chat.peerId);
         } else {
@@ -645,8 +748,8 @@ class MessageService {
         await _notice(
           chat.peerId,
           seconds == null
-              ? '${chat.peerUsername} turned off the auto-delete timer.'
-              : '${chat.peerUsername} set the auto-delete timer to ${timerLabel(seconds)}.',
+              ? '${chat.name} turned off the auto-delete timer.'
+              : '${chat.name} set the auto-delete timer to ${timerLabel(seconds)}.',
           now,
         );
         return const IncomingOutcome.skipped();

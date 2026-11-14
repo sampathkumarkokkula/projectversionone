@@ -34,6 +34,8 @@ dependencies:
 
   # Argon2id password verifiers, SHA-256 safety numbers, CSPRNG, UUIDs.
   hashlib: ^2.4.2
+  # AES-256-GCM (high-level AEAD API) for the password-protected account backup.
+  cryptography: ^2.9.0
 
   # Content-free push wake-ups (optional at runtime) and a generic local notification.
   firebase_core: ^5.1.0

@@ -23,12 +23,21 @@ class PasswordPolicyException implements Exception {
 /// slot holds the verifier of a random 256-bit password nobody knows, so the
 /// stored data looks the same either way, and every unlock attempt computes
 /// both hashes, so main, secondary and wrong passwords cost the same time.
+/// Notified whenever a password slot changes, so the account backup key for
+/// that slot can follow ([password] null = slot holds a random decoy).
+abstract interface class SlotKeyListener {
+  Future<void> slotChanged(PasswordSlot slot, String? password);
+}
+
+enum PasswordSlot { main, secondary }
+
 class LockService {
-  LockService({required this.settings, required this.hasher, required this.clock});
+  LockService({required this.settings, required this.hasher, required this.clock, this.slotKeys});
 
   final LocalSettings settings;
   final PasswordHasher hasher;
   final Clock clock;
+  final SlotKeyListener? slotKeys;
 
   static const int minLength = 8;
   static const int maxLength = 128;
@@ -74,6 +83,26 @@ class LockService {
     ]);
     await settings.write(_main, verifiers[0]);
     await settings.write(_secondary, verifiers[1]);
+    await _clearFailures();
+    await slotKeys?.slotChanged(PasswordSlot.main, main);
+    await slotKeys?.slotChanged(PasswordSlot.secondary, identical(secondarySecret, secondary) ? secondary : null);
+  }
+
+  /// Both verifiers, for the encrypted account backup.
+  Future<({String main, String secondary})?> exportVerifiers() async {
+    final main = await settings.read(_main);
+    final secondary = await settings.read(_secondary);
+    if (main == null || secondary == null) return null;
+    return (main: main, secondary: secondary);
+  }
+
+  /// Restores both verifiers from the account backup on a new phone.
+  Future<void> importVerifiers({required String main, required String secondary}) async {
+    if (!main.startsWith(r'$argon2id$') || !secondary.startsWith(r'$argon2id$')) {
+      throw const FormatException('invalid verifier');
+    }
+    await settings.write(_main, main);
+    await settings.write(_secondary, secondary);
     await _clearFailures();
   }
 
@@ -146,6 +175,7 @@ class LockService {
       }
     }
     await settings.write(mode == UnlockMode.normal ? _main : _secondary, await hasher.hash(next));
+    await slotKeys?.slotChanged(mode == UnlockMode.normal ? PasswordSlot.main : PasswordSlot.secondary, next);
     return true;
   }
 
@@ -170,6 +200,7 @@ class LockService {
     }
     final slot = mode == UnlockMode.normal ? _secondary : _main;
     await settings.write(slot, await hasher.hash(newSecret ?? _decoy()));
+    await slotKeys?.slotChanged(mode == UnlockMode.normal ? PasswordSlot.secondary : PasswordSlot.main, newSecret);
     return true;
   }
 }

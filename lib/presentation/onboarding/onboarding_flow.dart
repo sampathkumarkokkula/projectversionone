@@ -11,10 +11,11 @@ import '../widgets/common.dart';
 import '../widgets/private_text_field.dart';
 import 'password_form.dart';
 
-enum _Step { welcome, email, code, profile, passwords }
+enum _Step { welcome, email, code, profile, restore, passwords }
 
-/// Registration: e-mail (OTP) -> username + phone -> passwords. An existing
-/// account signing in on a new phone skips the profile step.
+/// Registration: e-mail (OTP) -> username, name + phone -> passwords.
+/// An existing account on a new phone types its app password instead, which
+/// restores the passwords, profile and contacts from the encrypted backup.
 class OnboardingFlow extends ConsumerStatefulWidget {
   const OnboardingFlow({super.key});
 
@@ -30,7 +31,9 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
   final _email = TextEditingController();
   final _code = TextEditingController();
   final _username = TextEditingController();
+  final _displayName = TextEditingController();
   final _phone = TextEditingController();
+  final _restorePassword = TextEditingController();
 
   MyProfile? _existing;
 
@@ -38,7 +41,8 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
 
   @override
   void dispose() {
-    for (final c in [_email, _code, _username, _phone]) {
+    _restorePassword.clear();
+    for (final c in [_email, _code, _username, _displayName, _phone, _restorePassword]) {
       c.dispose();
     }
     super.dispose();
@@ -84,7 +88,11 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
     }
     await _run(() async {
       _existing = await _account.verifySignInCode(_email.text, code);
-      _go(_existing == null ? _Step.profile : _Step.passwords);
+      if (_existing == null) {
+        _go(_Step.profile);
+      } else {
+        _go(_account.hasRemoteBackup ? _Step.restore : _Step.passwords);
+      }
     });
   }
 
@@ -107,6 +115,22 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
     });
   }
 
+  Future<void> _restore() async {
+    final password = _restorePassword.text;
+    final existing = _existing;
+    if (password.isEmpty || existing == null) return;
+    await _run(() async {
+      final mode = await _account.restoreOnThisDevice(profile: existing, password: password);
+      if (mode == null) {
+        _restorePassword.clear();
+        if (mounted) setState(() => _error = 'Wrong password.');
+        return;
+      }
+      _restorePassword.clear();
+      ref.read(sessionProvider.notifier).finishOnboarding(mode: mode);
+    });
+  }
+
   Future<void> _finish(String main, String? secondary) async {
     setState(() => _error = null);
     try {
@@ -117,6 +141,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
           phone: _phone.text,
           mainPassword: main,
           secondaryPassword: secondary,
+          displayName: _displayName.text,
         );
       } else {
         await _account.continueOnThisDevice(
@@ -194,17 +219,25 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
       _Step.profile => [
           Text('Create your profile', style: text.headlineSmall),
           const SizedBox(height: 8),
-          const Text('People find you by your username only.'),
+          const Text('People find you by your username only. Your name is what they see in the chat.'),
           const SizedBox(height: 20),
           PrivateTextField(
             controller: _username,
             label: 'Username',
-            helper: '3-24 characters: a-z, 0-9 and _',
+            helper: '3-24 characters: a-z, 0-9 and _. Used to find you.',
             maxLength: 24,
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9_]')),
               LowerCaseFormatter(),
             ],
+          ),
+          const SizedBox(height: 12),
+          PrivateTextField(
+            controller: _displayName,
+            label: 'Name (optional)',
+            helper: 'Shown to the people you chat with. You can change it later.',
+            maxLength: 40,
+            textCapitalization: TextCapitalization.words,
           ),
           const SizedBox(height: 12),
           PrivateTextField(
@@ -217,13 +250,37 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
           const SizedBox(height: 20),
           BusyButton(label: 'Continue', busy: _busy, onPressed: _checkProfile),
         ],
+      _Step.restore => [
+          Text('Welcome back, ${_existing!.username}', style: text.headlineSmall),
+          const SizedBox(height: 8),
+          const Text(
+            'Enter your BVM password to restore your passwords, profile and contacts on this '
+            'phone. Chat history never leaves a phone, so the chats start empty.',
+          ),
+          const SizedBox(height: 20),
+          PrivateTextField(
+            controller: _restorePassword,
+            label: 'Password',
+            obscure: true,
+            autofocus: true,
+            enabled: !_busy,
+            onSubmitted: (_) => _restore(),
+          ),
+          const SizedBox(height: 16),
+          BusyButton(label: 'Restore', busy: _busy, onPressed: _restore),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _busy ? null : () => _confirmStartFresh(context),
+            child: const Text('Forgot your password? Start fresh'),
+          ),
+        ],
       _Step.passwords => [
           Text(_existing == null ? 'Protect the app' : 'Welcome back, ${_existing!.username}', style: text.headlineSmall),
           if (_existing != null) ...[
             const SizedBox(height: 8),
             const Text(
-              'Chat history never moves between phones, so this phone starts with an empty chat '
-              'list. Your contacts will see that your security code changed.',
+              'Choose your app passwords for this phone. Your contact list is not restored. '
+              'Chat history never moves between phones.',
             ),
           ],
           const SizedBox(height: 20),
@@ -241,6 +298,24 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
         ],
       ),
     );
+  }
+
+  Future<void> _confirmStartFresh(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Start fresh?'),
+        content: const Text(
+          'You choose new passwords and start with an empty contact list. The saved contact list '
+          'is replaced. Your account, username and blocked users stay.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Start fresh')),
+        ],
+      ),
+    );
+    if (ok == true) _go(_Step.passwords);
   }
 }
 

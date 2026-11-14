@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/account_deletion.dart';
 import '../../data/local/app_database.dart' show selfAvatarId;
+import '../../data/push/push_service.dart' show PushState;
 import '../providers.dart';
 import '../session_controller.dart';
 import '../util/format.dart';
@@ -23,6 +24,7 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final username = ref.watch(usernameProvider).value;
+    final displayName = ref.watch(displayNameProvider).value;
     final scheme = Theme.of(context).colorScheme;
     void open(Widget screen) =>
         Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen));
@@ -57,6 +59,13 @@ class SettingsScreen extends ConsumerWidget {
             'Only people you chat with see your picture.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall,
+          ),
+          ListTile(
+            leading: const Icon(Icons.badge_outlined),
+            title: Text(displayName ?? 'Add your name'),
+            subtitle: const Text('Shown to the people you chat with, instead of your username.'),
+            trailing: replaced ? null : const Icon(Icons.edit_outlined),
+            onTap: replaced ? null : () => changeDisplayNameDialog(context, ref, displayName ?? ''),
           ),
           ListTile(
             leading: const Icon(Icons.alternate_email),
@@ -190,23 +199,64 @@ class _NotificationsTileState extends ConsumerState<_NotificationsTile> {
   @override
   Widget build(BuildContext context) {
     final enabled = _enabled;
-    return ListTile(
-      leading: Icon(enabled == false ? Icons.notifications_off_outlined : Icons.notifications_outlined),
-      title: Text(enabled == false ? 'Notifications are off' : 'New-message notifications'),
-      subtitle: const Text(
-        'They only say "New message": never who wrote or what. While BVM is closed they can take up to '
-        '15 minutes unless push is set up.',
-      ),
-      isThreeLine: true,
-      trailing: enabled == false
-          ? TextButton(
-              onPressed: () async {
-                await ref.read(servicesProvider).notifications.requestPermission();
-                await _refresh();
-              },
-              child: const Text('Turn on'),
-            )
-          : null,
+    final push = ref.read(servicesProvider).push;
+    return Column(
+      children: [
+        ListTile(
+          leading: Icon(enabled == false ? Icons.notifications_off_outlined : Icons.notifications_outlined),
+          title: Text(enabled == false ? 'Notifications are blocked' : 'Notifications are allowed'),
+          subtitle: const Text(
+            'They only say "New message": never who wrote or what. While a chat is open on screen, '
+            'no notification is shown.',
+          ),
+          isThreeLine: true,
+          trailing: enabled == false
+              ? TextButton(
+                  onPressed: () async {
+                    await ref.read(servicesProvider).notifications.requestPermission();
+                    await _refresh();
+                  },
+                  child: const Text('Turn on'),
+                )
+              : null,
+        ),
+        ValueListenableBuilder<PushState>(
+          valueListenable: push.state,
+          builder: (context, state, _) {
+            final (IconData icon, String title, String detail) = switch (state) {
+              PushState.registered => (
+                  Icons.bolt,
+                  'Instant push is on',
+                  'Alerts arrive within seconds, even when BVM is closed.',
+                ),
+              PushState.notInBuild => (
+                  Icons.schedule,
+                  'Instant push is not in this app',
+                  'This APK was built without the Firebase settings, so alerts for a closed app can take '
+                      'up to 15 minutes. Add FIREBASE_* to .env and rebuild (README section 3).',
+                ),
+              PushState.starting => (Icons.hourglass_empty, 'Instant push is starting…', 'Registering with Firebase.'),
+              PushState.failed => (
+                  Icons.error_outline,
+                  'Instant push failed',
+                  '${push.lastError ?? 'Unknown error'}. Alerts for a closed app can take up to 15 minutes.',
+                ),
+            };
+            return ListTile(leading: Icon(icon), title: Text(title), subtitle: Text(detail));
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.notification_add_outlined),
+          title: const Text('Send a test notification'),
+          subtitle: const Text('Shows one now, to check that this phone displays BVM alerts.'),
+          onTap: () async {
+            final notifications = ref.read(servicesProvider).notifications;
+            await notifications.requestPermission();
+            await notifications.show(1);
+            await _refresh();
+          },
+        ),
+      ],
     );
   }
 }

@@ -44,6 +44,12 @@ class Chats extends Table {
   /// Last time the peer's username was checked against the directory.
   IntColumn get directoryCheckedAt => integer().withDefault(const Constant(0))();
 
+  // ---- schema v3 ----
+
+  /// Name the peer chose to show (from their encrypted profile); null = use
+  /// the username.
+  TextColumn get peerDisplayName => text().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {peerId};
 }
@@ -118,6 +124,23 @@ class Avatars extends Table {
 }
 
 const String selfAvatarId = 'self';
+
+/// KeyValues key of this user's own display name.
+const String selfDisplayNameKey = 'self.displayName';
+
+/// Display names: 1-40 characters, no line breaks or control characters.
+String? cleanDisplayName(String? value) {
+  if (value == null) return null;
+  final cleaned = value.replaceAll(RegExp(r'[\u0000-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2066-\u2069]'), ' ').trim();
+  final collapsed = cleaned.replaceAll(RegExp(r'\s+'), ' ');
+  if (collapsed.isEmpty) return null;
+  return collapsed.length > 40 ? collapsed.substring(0, 40).trim() : collapsed;
+}
+
+extension ChatNames on Chat {
+  /// What the app shows for this contact: their display name, else username.
+  String get name => peerDisplayName ?? peerUsername;
+}
 
 /// Pickled (encrypted with the Olm pickle key) Olm sessions.
 class OlmSessions extends Table {
@@ -210,7 +233,7 @@ class AppDatabase extends _$AppDatabase implements LocalSettings {
   AppDatabase(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -226,6 +249,9 @@ class AppDatabase extends _$AppDatabase implements LocalSettings {
             await m.createTable(media);
             await m.createTable(mediaParts);
             await m.createTable(avatars);
+          }
+          if (from < 3) {
+            await m.addColumn(chats, chats.peerDisplayName);
           }
         },
         beforeOpen: (details) async {

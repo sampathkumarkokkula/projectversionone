@@ -28,7 +28,7 @@ Future<bool> _confirm(BuildContext context, String title, String body, String ac
 Future<void> blockWithConfirm(BuildContext context, WidgetRef ref, Chat chat) async {
   final ok = await _confirm(
     context,
-    'Block ${chat.peerUsername}?',
+    'Block ${chat.name}?',
     'They will not be able to send you messages or photos, and won\'t be told that you blocked them. '
         'The chat stays on your phone.',
     'Block',
@@ -43,7 +43,7 @@ Future<void> blockWithConfirm(BuildContext context, WidgetRef ref, Chat chat) as
 }
 
 Future<void> unblockWithConfirm(BuildContext context, WidgetRef ref, Chat chat) async {
-  final ok = await _confirm(context, 'Unblock ${chat.peerUsername}?', 'They can send you messages again.', 'Unblock');
+  final ok = await _confirm(context, 'Unblock ${chat.name}?', 'They can send you messages again.', 'Unblock');
   if (!ok || !context.mounted) return;
   try {
     await ref.read(servicesProvider).chatActions.unblock(chat.peerId);
@@ -56,7 +56,7 @@ Future<void> unblockWithConfirm(BuildContext context, WidgetRef ref, Chat chat) 
 Future<void> reportSpamWithConfirm(BuildContext context, WidgetRef ref, Chat chat) async {
   final ok = await _confirm(
     context,
-    'Report ${chat.peerUsername} as spam?',
+    'Report ${chat.name} as spam?',
     'They will be blocked and this chat deleted from your phone. Your report contains no messages '
         '(they stay end-to-end encrypted). Accounts reported by several people are suspended and '
         'their e-mail address is banned.',
@@ -77,7 +77,7 @@ Future<void> deleteChatWithConfirm(BuildContext context, WidgetRef ref, Chat cha
   final ok = await _confirm(
     context,
     'Delete this chat?',
-    'All messages and photos with ${chat.peerUsername} are deleted from this phone. Their phone is not affected.',
+    'All messages and photos with ${chat.name} are deleted from this phone. Their phone is not affected.',
     'Delete',
     danger: true,
   );

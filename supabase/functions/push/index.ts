@@ -36,7 +36,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (ids.length === 0) return json({ pushed: 0 });
 
   const sa = parseServiceAccount(Deno.env.get("FCM_SERVICE_ACCOUNT"));
-  if (!sa) return json({ pushed: 0, reason: "push-not-configured" });
+  if (!sa) {
+    console.warn("push: FCM_SERVICE_ACCOUNT secret missing or invalid");
+    return json({ pushed: 0, reason: "push-not-configured" });
+  }
 
   const { data, error } = await admin.rpc("push_targets", { p_sender: uid, p_relay_ids: ids });
   if (error) {
@@ -44,20 +47,35 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: "lookup failed" }, 500);
   }
   const targets = (data ?? []) as { recipient_id: string; fcm_token: string }[];
-  if (targets.length === 0) return json({ pushed: 0 });
+  if (targets.length === 0) {
+    // The recipient's phone never registered for push (build without Firebase,
+    // notifications denied, or registration failed), or a push went out in
+    // the last 5 seconds.
+    console.log(`push: envelopes=${ids.length} targets=0 (no push registration or coalesced)`);
+    return json({ pushed: 0, reason: "no-registered-recipient" });
+  }
 
-  const bearer = await accessToken(sa);
+  let bearer: string;
+  try {
+    bearer = await accessToken(sa);
+  } catch (e) {
+    console.error("push: oauth token request failed - check FCM_SERVICE_ACCOUNT", (e as Error).message);
+    return json({ error: "oauth failed" }, 500);
+  }
   let pushed = 0;
+  let dropped = 0;
   for (const t of targets) {
     try {
       if (await sendWake(sa, bearer, t.fcm_token)) {
         pushed++;
       } else {
+        dropped++;
         await admin.rpc("drop_push_token", { p_user_id: t.recipient_id, p_token: t.fcm_token });
       }
     } catch (e) {
       console.error("push: send failed", (e as Error).message);
     }
   }
+  console.log(`push: envelopes=${ids.length} targets=${targets.length} pushed=${pushed} invalid=${dropped}`);
   return json({ pushed });
 });

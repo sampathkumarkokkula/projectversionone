@@ -9,10 +9,12 @@ import '../data/remote/supabase_backend.dart';
 import '../domain/lock_service.dart';
 import '../domain/message_service.dart';
 import '../domain/ports.dart';
+import '../domain/models.dart';
 import '../domain/wipe_service.dart';
+import 'backup_service.dart';
 
-/// Registration, new-device sign-in, password reset, profile (username and
-/// picture), and key upkeep.
+/// Registration, new-device sign-in (with backup restore), password reset,
+/// profile (username, display name, picture), and key upkeep.
 class AccountService {
   AccountService({
     required this.backend,
@@ -22,6 +24,7 @@ class AccountService {
     required this.db,
     required this.keyStore,
     required this.messages,
+    required this.backup,
   });
 
   final SupabaseBackend backend;
@@ -31,6 +34,10 @@ class AccountService {
   final AppDatabase db;
   final DeviceKeyStore keyStore;
   final MessageService messages;
+  final BackupService backup;
+
+  /// Backup copies fetched after the e-mail code, for [restoreOnThisDevice].
+  List<String>? _remoteBackup;
 
   static const _selfId = 'self.id';
   static const _selfUsername = 'self.username';
@@ -75,7 +82,44 @@ class AccountService {
     final normalized = normalizeEmail(email);
     await backend.verifyEmailCode(normalized, code.trim());
     await db.write(_selfEmail, normalized);
-    return backend.myProfile();
+    final profile = await backend.myProfile();
+    _remoteBackup = null;
+    if (profile != null) {
+      try {
+        _remoteBackup = await backup.fetchRemote();
+      } on Object catch (e) {
+        logDebug('backup: fetch failed (${e.runtimeType})');
+      }
+    }
+    return profile;
+  }
+
+  /// Whether the account has a backup this phone can restore.
+  bool get hasRemoteBackup => _remoteBackup != null;
+
+  /// New or reinstalled phone: opens the backup with the existing app
+  /// password and restores passwords, profile and contacts (chats empty).
+  /// Returns which password was typed, or null when it is wrong.
+  ///
+  /// Typing the secondary password behaves like unlocking with it: the
+  /// contacts look the same, and wipe commands go to every chat with an
+  /// auto-delete timer.
+  Future<UnlockMode?> restoreOnThisDevice({required MyProfile profile, required String password}) async {
+    final copies = _remoteBackup;
+    if (copies == null) throw StateError('no backup');
+    final restored = await backup.open(copies, password);
+    if (restored == null) return null;
+    await lock.importVerifiers(main: restored.mainVerifier, secondary: restored.secondaryVerifier);
+    final result = await lock.verify(password);
+    if (result == UnlockResult.invalid) return null;
+    await backup.importKeys(restored);
+    await _becomeCurrentDevice();
+    await _finishSetup(profile.username);
+    await backup.restoreContent(restored, backend);
+    final mode = result == UnlockResult.duress ? UnlockMode.duress : UnlockMode.normal;
+    if (mode == UnlockMode.duress) await wipe.duressWipe();
+    _remoteBackup = null;
+    return mode;
   }
 
   Future<bool> usernameAvailable(String username) =>
@@ -83,6 +127,24 @@ class AccountService {
 
   /// First registration: identity keys, directory entry, passwords.
   Future<void> register({
+    required String username,
+    required String phone,
+    required String mainPassword,
+    String? secondaryPassword,
+    String? displayName,
+  }) async {
+    final name = cleanDisplayName(displayName);
+    if (name != null) await db.write(selfDisplayNameKey, name);
+    await _registerAccount(
+      username: username,
+      phone: phone,
+      mainPassword: mainPassword,
+      secondaryPassword: secondaryPassword,
+    );
+    if (name != null) await messages.bumpProfileVersion();
+  }
+
+  Future<void> _registerAccount({
     required String username,
     required String phone,
     required String mainPassword,
@@ -200,6 +262,22 @@ class AccountService {
   // ---------------------------------------------------------------------------
   // Profile
   // ---------------------------------------------------------------------------
+
+  Future<String?> displayName() async => cleanDisplayName(await db.read(selfDisplayNameKey));
+
+  /// The name people you chat with see instead of your username (empty =
+  /// show the username). Sent end-to-end encrypted with your profile; the
+  /// server never sees it.
+  Future<void> setDisplayName(String? value) async {
+    final name = cleanDisplayName(value);
+    if (name == await displayName()) return;
+    if (name == null) {
+      await db.remove(selfDisplayNameKey);
+    } else {
+      await db.write(selfDisplayNameKey, name);
+    }
+    await messages.bumpProfileVersion();
+  }
 
   /// Changes the public username (at most once every 24 hours). People you
   /// chat with see the new name on their next sync.

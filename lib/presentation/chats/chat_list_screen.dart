@@ -137,10 +137,10 @@ class _ChatTile extends StatelessWidget {
             ? 'Request'
             : null;
     return ListTile(
-      leading: AvatarCircle(ownerId: chat.peerId, name: chat.peerUsername),
+      leading: AvatarCircle(ownerId: chat.peerId, name: chat.name),
       title: Row(
         children: [
-          Flexible(child: Text(chat.peerUsername, maxLines: 1, overflow: TextOverflow.ellipsis)),
+          Flexible(child: Text(chat.name, maxLines: 1, overflow: TextOverflow.ellipsis)),
           if (label != null) ...[
             const SizedBox(width: 6),
             Container(
