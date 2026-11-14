@@ -51,7 +51,7 @@ Status: **milestone M1 (release APK), feature update v2**. See
 | New-message alerts | **On by default, no setup needed.** They only say "BVM - New message": never who wrote or what, and they are hidden on a secure lock screen. Android 13+ asks for permission after the first unlock (Settings > Notifications shows the state). |
 | App open in the background | Alert as soon as the message arrives (Realtime). |
 | App closed | A background task asks the server every ~15 minutes, with a random per-phone token and no login session, whether messages wait. Android may delay it in battery saving. |
-| Instant alerts when closed (optional) | Configure Firebase Cloud Messaging (sections 3 and 2.5); the push carries no content. |
+| Instant alerts when closed (optional) | Configure Firebase Cloud Messaging (section 3, about 10 minutes, free); the push carries no content. |
 
 ### Privacy and the app lock
 | Feature | How it works |
@@ -181,26 +181,64 @@ Keep the project outside OneDrive (sync corrupts Gradle/Cargo outputs).
      signup**, include the code, for example `<p>Your BVM code: {{ .Token }}</p>`,
      and remove the link if you like. New free projects can edit templates only
      after custom SMTP is configured. The app accepts 6-10 digit codes.
-4. **Edge Functions** (`push`, `delete-account`): with the CLI,
-   `npx supabase functions deploy push --no-verify-jwt` and
-   `npx supabase functions deploy delete-account --no-verify-jwt`
-   (both verify the caller's token themselves), or create them in the dashboard
-   (Edge Functions > Deploy a new function) with the same names and paste
-   `index.ts` together with `supabase/functions/_shared/supabase.ts`.
-5. **Push (optional):** Edge Functions > Secrets: add `FCM_SERVICE_ACCOUNT`
-   with the JSON of a Firebase service account (Firebase console > Project
-   settings > Service accounts > Generate new private key). Without it the
-   push function answers `push-not-configured` and everything else works.
+4. **Edge Functions** (`push`, `delete-account`, both needed for "Delete my
+   account" and instant notifications):
+   `powershell -ExecutionPolicy Bypass -File scripts\deploy-functions.ps1`
+   (downloads the Supabase CLI, asks for a personal access token, deploys
+   both with `--no-verify-jwt`; they verify the caller's token themselves).
+5. **Push (optional):** see section 3. Without the `FCM_SERVICE_ACCOUNT`
+   secret the push function answers `push-not-configured` and everything
+   else works.
 6. Project Settings > API Keys: copy the project URL and the **publishable**
    key into `.env` (copy `.env.example`). Never put the secret key in the app.
 
-## 3. Firebase (optional push)
+## 3. Firebase: instant notifications (optional, free)
 
-Create a Firebase project (Spark plan), add an Android app with package
-`app.bvm.messenger`, and copy app id, API key, sender id and project id from
-Project settings into `.env`. No `google-services.json` is needed: Gradle
-turns these values into the Android resources Firebase reads. Leave them empty
-to build without push.
+Without Firebase, notifications still work (section "Notifications"), but a
+closed app can take up to ~15 minutes. With Firebase the phone is woken within
+seconds. The push contains only `{"t":"wake"}`: Google never sees who wrote,
+what, or any ciphertext.
+
+1. **Create the project:** [console.firebase.google.com](https://console.firebase.google.com)
+   > *Create a project* (any name). Google Analytics is not needed: turn it
+   off. The free Spark plan needs no card.
+2. **Add the Android app:** Project overview > *Add app* > Android. Package
+   name **`app.bvm.messenger`** (exactly). Skip the SHA-1 and the SDK steps.
+   Download **`google-services.json`**.
+3. **Put the app settings into `.env`:**
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts\firebase-env.ps1 C:\Users\<you>\Downloads\google-services.json
+   ```
+   This fills `FIREBASE_APP_ID`, `FIREBASE_API_KEY`,
+   `FIREBASE_MESSAGING_SENDER_ID` and `FIREBASE_PROJECT_ID`. Gradle turns them
+   into the Android resources Firebase reads, so the JSON file is not needed in
+   the project (keep it out of git).
+4. **Create the server key:** Project settings (gear) > *Service accounts* >
+   *Generate new private key*. This JSON lets the server send pushes. Treat it
+   like a password: never commit it, never put it in the app.
+   *Cloud Messaging API (V1)* must be enabled (Project settings > Cloud
+   Messaging); it is on by default for new projects.
+5. **Deploy the functions and store the key on Supabase:** create a personal
+   access token at supabase.com > Account > Access Tokens, then:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts\deploy-functions.ps1 -ServiceAccount C:\Users\<you>\Downloads\<project>-firebase-adminsdk-xxxx.json
+   ```
+   The script downloads the Supabase CLI into `.toolchain` (no Docker or
+   Node.js needed), asks for the token (not saved), deploys `push` and
+   `delete-account`, and saves the key as the secret `FCM_SERVICE_ACCOUNT`.
+   You can delete both downloaded JSON files afterwards; keep the service
+   account only if you may redeploy (you can always generate a new one).
+6. **Rebuild and install** (`scripts\build-apk.ps1 -SkipTests`). On first
+   unlock, allow notifications.
+
+**Check:** send a message from another account while BVM is closed; "BVM -
+New message" should appear within seconds. If it doesn't: Supabase dashboard >
+Edge Functions > `push` > Logs. `push-not-configured` means the secret is
+missing; an `oauth token request failed` error means the service-account key
+is wrong or the FCM API is disabled.
+
+Without the `FIREBASE_*` lines in `.env` the app builds without push and
+nothing tries to contact Firebase.
 
 ## 4. Build the release APK (M1)
 

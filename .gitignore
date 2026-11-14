@@ -11,6 +11,8 @@
 android/key.properties
 google-services.json
 GoogleService-Info.plist
+*firebase-adminsdk*.json
+*service-account*.json
 supabase/.env
 supabase/.temp/
 supabase/functions/.env
