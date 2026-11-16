@@ -68,6 +68,9 @@ android {
             resValue("string", "google_api_key", dartDefines["FIREBASE_API_KEY"].orEmpty())
             resValue("string", "gcm_defaultSenderId", dartDefines["FIREBASE_MESSAGING_SENDER_ID"].orEmpty())
             resValue("string", "project_id", dartDefines["FIREBASE_PROJECT_ID"].orEmpty())
+            logger.lifecycle("BVM: Firebase push settings included (project ${dartDefines["FIREBASE_PROJECT_ID"]})")
+        } else {
+            logger.lifecycle("BVM: no FIREBASE_APP_ID in .env, building without instant push")
         }
     }
 

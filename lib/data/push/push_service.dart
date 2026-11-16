@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show PlatformException;
 
 import '../../core/env.dart';
 import '../../core/log.dart';
@@ -60,12 +61,20 @@ class PushService {
     required void Function() onWake,
   }) async {
     if (!available || _initialized) return;
+    final missing = Env.missingFirebaseValues;
+    if (missing.isNotEmpty) {
+      _fail('this build is missing ${missing.join(', ')} (rebuild after scripts\\firebase-env.ps1)');
+      return;
+    }
     state.value = PushState.starting;
+    var step = 'Firebase start';
     try {
-      await Firebase.initializeApp();
+      await _initializeFirebase();
+      step = 'notification permission';
       FirebaseMessaging.onBackgroundMessage(bvmFirebaseBackgroundHandler);
       final messaging = FirebaseMessaging.instance;
       await messaging.requestPermission(alert: true, badge: false, sound: true);
+      step = 'push registration';
       _messageSub = FirebaseMessaging.onMessage.listen((_) => onWake());
       // FID-based registration (FCM's replacement for registration tokens).
       // Auto-init is disabled in the manifest, so register explicitly.
@@ -88,8 +97,42 @@ class PushService {
         }
       });
     } on Object catch (e) {
-      _fail('Firebase start failed (${e.runtimeType})');
+      _fail('$step failed: ${describeError(e)}');
     }
+  }
+
+  /// Uses the options compiled into the Dart code. Only when the native side
+  /// already has a default app (Android resources) is that one reused.
+  static Future<void> _initializeFirebase() async {
+    final options = FirebaseOptions(
+      appId: Env.firebaseAppId,
+      apiKey: Env.firebaseApiKey,
+      messagingSenderId: Env.firebaseSenderId,
+      projectId: Env.firebaseProjectId,
+    );
+    try {
+      await Firebase.initializeApp(options: options);
+    } on FirebaseException catch (e) {
+      // Already created natively from resources: use that instance.
+      if (e.code != 'duplicate-app') rethrow;
+    }
+  }
+
+  /// A readable reason even in an obfuscated release build, where type names
+  /// are minified (e.g. "fP"). Firebase and platform errors carry a code and
+  /// a message; nothing secret is in them.
+  @visibleForTesting
+  static String describeError(Object e) {
+    final String text;
+    if (e is FirebaseException) {
+      text = '[${e.plugin}/${e.code}] ${e.message ?? ''}';
+    } else if (e is PlatformException) {
+      text = '[${e.code}] ${e.message ?? ''}';
+    } else {
+      text = e.toString();
+    }
+    final oneLine = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return oneLine.length > 240 ? '${oneLine.substring(0, 240)}…' : oneLine;
   }
 
   /// Stops push for this device (account deletion, account moved).
