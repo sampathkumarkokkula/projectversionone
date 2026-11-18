@@ -151,7 +151,7 @@ Keep the project outside OneDrive (sync corrupts Gradle/Cargo outputs).
 ## 2. Supabase (free tier)
 
 1. Create a project at supabase.com (no card needed).
-2. **Schema:** in the SQL Editor run the three migration files, in this order
+2. **Schema:** in the SQL Editor run the four migration files, in this order
    (each: paste > Run):
    1. `supabase/migrations/20261031000000_bvm_init.sql`: tables with RLS, RPCs,
       Realtime publication, 5-minute TTL job, phone-encryption key in Vault.
@@ -160,6 +160,8 @@ Keep the project outside OneDrive (sync corrupts Gradle/Cargo outputs).
       notification inbox check.
    3. `supabase/migrations/20261116000000_bvm_v3_account_backup.sql`: the
       encrypted account backup (passwords and contacts survive a new sign-in).
+   4. `supabase/migrations/20261118000000_bvm_v4_rate_limits.sql`: per-account
+      rate limits on lookups, key claims, sending, reports and backups.
 
    A project that already ran the earlier files only needs the newer ones. All
    are safe to run again. With the CLI instead: `npx supabase link --project-ref <ref>`
@@ -255,7 +257,8 @@ The script creates the upload keystore on first use
 (`scripts\create-keystore.ps1`: RSA 4096 in `.secrets\upload-keystore.jks`, a
 random password in `android\key.properties`, both git-ignored), regenerates the
 Drift code, runs the tests, builds an obfuscated, R8-shrunk release APK with
-`--dart-define-from-file=.env`, and writes `dist\bvm-1.0.0-1-release.apk` plus
+`--dart-define-from-file=.env`, and writes `dist\bvm-<version>-release.apk`
+(for example `bvm-1.1.0-2-release.apk`; the version comes from `pubspec.yaml`) plus
 a `.sha256` file. **Back up `.secrets\` and `android\key.properties` offline**;
 updates must be signed with the same key. Use `-SplitPerAbi` for smaller
 per-architecture APKs, `-SkipTests` to skip the tests.
@@ -265,7 +268,7 @@ Without `.env`, the APK builds but opens a "not configured" screen.
 ## 5. Install
 
 * **adb:** enable Developer options > USB debugging on the phone, connect it, then
-  `.\.toolchain\android-sdk\platform-tools\adb.exe install -r dist\bvm-1.0.0-1-release.apk`
+  `.\.toolchain\android-sdk\platform-tools\adb.exe install -r dist\bvm-1.1.0-2-release.apk`
 * **Direct transfer:** copy the APK to the phone (USB, cable, local share), open
   it in Files and allow "Install unknown apps" for that app when Android asks.
   Compare the SHA-256 from the `.sha256` file if the transfer path is not trusted.
@@ -313,9 +316,10 @@ yet; their server side is covered by `rls_v2_test.sql`.
 ## Updating an existing install
 
 1. `git pull`
-2. Run the migrations you have not run yet in the SQL Editor (once each):
-   `20261115000000_bvm_v2_features.sql`, then
-   `20261116000000_bvm_v3_account_backup.sql`.
+2. Run the migrations you have not run yet in the SQL Editor (once each, in
+   order): `20261115000000_bvm_v2_features.sql`,
+   `20261116000000_bvm_v3_account_backup.sql`,
+   `20261118000000_bvm_v4_rate_limits.sql`.
 3. Redeploy the Edge Functions (`scripts\deploy-functions.ps1`, add
    `-ServiceAccount <json>` only to replace the Firebase key).
 4. Rebuild: `powershell -ExecutionPolicy Bypass -File scripts\build-apk.ps1 -SkipTests`
@@ -323,6 +327,13 @@ yet; their server side is covered by `rls_v2_test.sql`.
    database upgrades itself to schema v3; chats and messages are kept.
 5. Unlock the app once on each phone: that creates the encrypted account
    backup. Only after that does a new sign-in restore passwords and contacts.
+
+## Before real users
+
+Work through [docs/GO_LIVE.md](docs/GO_LIVE.md): the decisions only you can
+make (licence, operator details in the privacy policy), Supabase and Firebase
+settings for production, the keep-alive job that stops a Free project from
+being paused, backups, and a test plan on real phones.
 
 ## 7. Next milestones
 
@@ -336,4 +347,6 @@ yet; their server side is covered by `rls_v2_test.sql`.
 
 BVM depends on `vodozemac` (AGPL-3.0 Dart bindings over an Apache-2.0 core).
 Distributing the app therefore triggers AGPL obligations. This needs a decision
-before a paid version or App Store release; see SECURITY.md section 1.
+before a paid version or App Store release; see SECURITY.md section 1. If you
+publish under the AGPL, put the public repository link into `SOURCE_CODE_URL`
+in `.env`; Settings > About then shows it.

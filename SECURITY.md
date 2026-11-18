@@ -259,9 +259,12 @@ the phone uploads an encrypted backup to `private.account_backups` (RPCs
   not messages.
 * Display names are chosen freely and are not unique. The UI always shows the
   username next to a display name; the safety number is the real check.
-* Username lookups and one-time-key claims are not rate limited yet; key
-  claiming can be used to exhaust one-time keys (the fallback key keeps
-  sessions possible).
+* Rate limits (v4 migration) are per account: 200 username lookups, 200
+  one-time-key claims (20 per target), 3000 relay envelopes and 60 backup
+  uploads per hour, 20 spam reports per day; over a limit the call fails with
+  SQLSTATE BVM05. Someone with many accounts gets proportionally more, bounded
+  by the Auth sign-up and OTP limits. Draining a user's one-time keys remains
+  possible slowly; the fallback key keeps sessions possible.
 * Spam suspension can be abused by 5 coordinated accounts (each older than a
   day). The operator can lift a suspension (README section 2). A changed
   username becomes free immediately, so someone else can register it; existing

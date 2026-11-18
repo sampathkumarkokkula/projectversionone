@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/account_deletion.dart';
+import '../../core/env.dart';
 import '../../data/local/app_database.dart' show selfAvatarId;
 import '../../data/push/push_service.dart' show PushState;
 import '../providers.dart';
@@ -119,11 +120,14 @@ class SettingsScreen extends ConsumerWidget {
             title: const Text('Privacy policy'),
             onTap: () => open(const PrivacyPolicyScreen()),
           ),
-          const AboutListTile(
-            icon: Icon(Icons.info_outline),
+          AboutListTile(
+            icon: const Icon(Icons.info_outline),
             applicationName: 'BVM',
-            applicationVersion: '1.0.0',
-            applicationLegalese: 'Open-source licenses of the components are listed below.',
+            applicationVersion: Env.appVersion.isEmpty ? 'development build' : Env.appVersion,
+            applicationLegalese: [
+              if (Env.sourceCodeUrl.isNotEmpty) 'Source code: ${Env.sourceCodeUrl}',
+              'Open-source licenses of the components are listed below.',
+            ].join('\n\n'),
           ),
           const Divider(),
           ListTile(

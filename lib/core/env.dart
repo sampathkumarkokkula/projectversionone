@@ -18,6 +18,15 @@ abstract final class Env {
   static const String firebaseSenderId = String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID');
   static const String firebaseProjectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
 
+  /// `version:` from pubspec.yaml, passed by scripts/build-apk.ps1 and
+  /// build-aab.ps1. Empty in builds made another way.
+  static const String appVersion = String.fromEnvironment('APP_VERSION');
+
+  /// Optional public link to this app's source code, shown in Settings >
+  /// About. The AGPL-3.0 licence of a dependency requires offering the
+  /// source to users of a distributed build.
+  static const String sourceCodeUrl = String.fromEnvironment('SOURCE_CODE_URL');
+
   static bool get isConfigured {
     final uri = Uri.tryParse(supabaseUrl);
     return uri != null &&

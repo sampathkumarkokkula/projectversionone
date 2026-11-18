@@ -38,6 +38,7 @@ String describeError(Object error) {
     return 'This account was suspended after spam reports and can no longer send messages.';
   }
   if (error is EmailBlockedException) return 'This e-mail address can\'t be used with BVM.';
+  if (error is RateLimitedException) return 'You did that too often. Wait a while and try again.';
   if (error is ChatBlockedException) return 'Unblock this person to send messages.';
   if (error is UnsupportedImageException) return 'This picture format isn\'t supported. Try a JPEG or PNG.';
   if (error is ArgumentError && '${error.message}'.contains('image too large')) {

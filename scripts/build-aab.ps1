@@ -25,10 +25,11 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'tests failed' }
     }
 
-    flutter build appbundle --release --no-pub --obfuscate --split-debug-info=build\symbols "--dart-define-from-file=$envFile"
+    $pubspecVersion = (Select-String -Path 'pubspec.yaml' -Pattern '^version:\s*(\S+)').Matches[0].Groups[1].Value
+    flutter build appbundle --release --no-pub --obfuscate --split-debug-info=build\symbols "--dart-define=APP_VERSION=$pubspecVersion" "--dart-define-from-file=$envFile"
     if ($LASTEXITCODE -ne 0) { throw 'flutter build appbundle failed' }
 
-    $version = (Select-String -Path 'pubspec.yaml' -Pattern '^version:\s*(\S+)').Matches[0].Groups[1].Value.Replace('+', '-')
+    $version = $pubspecVersion.Replace('+', '-')
     New-Item -ItemType Directory -Force -Path 'dist' | Out-Null
     $target = Join-Path 'dist' "bvm-$version-release.aab"
     Copy-Item 'build\app\outputs\bundle\release\app-release.aab' $target -Force

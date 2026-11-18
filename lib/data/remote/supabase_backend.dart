@@ -42,6 +42,11 @@ class EmailBlockedException implements Exception {
   const EmailBlockedException();
 }
 
+/// The account made too many calls of one kind (server rate limit, BVM05).
+class RateLimitedException implements Exception {
+  const RateLimitedException();
+}
+
 /// A user on this account's server-side block list.
 class BlockedUser {
   const BlockedUser({required this.userId, required this.username});
@@ -90,6 +95,8 @@ class SupabaseBackend implements RelayApi, DirectoryApi {
           throw const EmailBlockedException();
         case 'BVM04':
           throw const UsernameChangeTooSoonException();
+        case 'BVM05':
+          throw const RateLimitedException();
       }
       rethrow;
     }

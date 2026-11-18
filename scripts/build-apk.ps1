@@ -43,13 +43,14 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'tests failed' }
     }
 
-    $buildArgs = @('build', 'apk', '--release', '--no-pub', '--obfuscate', '--split-debug-info=build\symbols')
+    $pubspecVersion = (Select-String -Path 'pubspec.yaml' -Pattern '^version:\s*(\S+)').Matches[0].Groups[1].Value
+    $buildArgs = @('build', 'apk', '--release', '--no-pub', '--obfuscate', '--split-debug-info=build\symbols', "--dart-define=APP_VERSION=$pubspecVersion")
     if ($SplitPerAbi) { $buildArgs += '--split-per-abi' }
     if (Test-Path $envFile) { $buildArgs += "--dart-define-from-file=$envFile" }
     flutter @buildArgs
     if ($LASTEXITCODE -ne 0) { throw 'flutter build apk failed' }
 
-    $version = (Select-String -Path 'pubspec.yaml' -Pattern '^version:\s*(\S+)').Matches[0].Groups[1].Value.Replace('+', '-')
+    $version = $pubspecVersion.Replace('+', '-')
     New-Item -ItemType Directory -Force -Path 'dist' | Out-Null
     Get-ChildItem 'build\app\outputs\flutter-apk' -Filter '*-release.apk' | ForEach-Object {
         $name = $_.Name.Replace('app-', "bvm-$version-")
