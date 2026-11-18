@@ -323,6 +323,7 @@ class SupabaseBackend implements RelayApi, DirectoryApi {
       });
     } on PostgrestException catch (e) {
       if (e.code == '23503') throw const RecipientGoneException();
+      if (e.code == 'BVM06') throw const RecipientInboxFullException();
       rethrow;
     }
   }

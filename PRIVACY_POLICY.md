@@ -22,7 +22,8 @@ your messages.
 | Phone number | Collected at registration; verification is planned for a later version | Encrypted (AES-256) in a database area that is not reachable through the API | Until you delete your account |
 | Username | Lets other people find you; this is the only thing others can search for | Public directory | Until you delete your account |
 | Public encryption keys | Let other phones start an encrypted chat with you | Public directory | Until you delete your account or reinstall |
-| Encrypted message envelopes | Delivery to the recipient's phone | Ciphertext only; deleted as soon as the recipient's phone has received it, at the latest after 30 days (earlier for messages with an auto-delete timer) | Minutes to at most 30 days |
+| Encrypted message envelopes | Delivery to the recipient's phone | Ciphertext only; deleted as soon as the recipient's phone has received it, at the latest after 30 days (earlier for messages with an auto-delete timer, receipts after 3 days, and everything waiting for a phone that has not connected for 30 days) | Minutes to at most 30 days |
+| Last fetch time | Deleting undelivered envelopes for phones that stopped connecting | One time stamp per account, updated at most hourly | Until you delete your account |
 | Encrypted photo parts | Delivery of photos | Ciphertext only, like messages; photos are stripped of location and camera data on your phone before encryption | Until delivered, at most 7 days |
 | Encrypted profile picture | Showing your picture to people you chat with | Ciphertext only, sent to each of your chats like a message; we cannot see it and do not keep it | Until delivered |
 | Username change time | Limiting changes to one per 24 hours | Directory | Until you delete your account |

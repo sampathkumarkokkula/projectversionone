@@ -359,14 +359,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   itemBuilder: (context, i) {
                     final m = rows[i];
                     final highlighted = m.id == _highlightId;
-                    return _MessageBubble(
+                    final bubble = _MessageBubble(
                       key: highlighted ? _focusKey : ValueKey(m.id),
                       message: m,
-                      peerName: chat?.peerUsername ?? '',
+                      peerName: chat?.name ?? '',
                       quoted: m.replyTo == null ? null : byId[m.replyTo],
                       hasQuote: m.replyTo != null,
                       highlighted: highlighted,
                       onLongPress: chat == null ? null : () => _showActions(m, chat, canSend: canSend),
+                    );
+                    if (!canSend || m.kind == MessageKind.system.name) return bubble;
+                    return _SwipeToReply(
+                      key: ValueKey('swipe-${m.id}'),
+                      onReply: () => setState(() => _replyTo = m),
+                      child: bubble,
                     );
                   },
                 );
@@ -435,6 +441,82 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
 /// Short text describing a message, for quotes and lists.
 String messagePreview(Message m) => m.kind == MessageKind.image.name ? 'Photo' : m.body.replaceAll('\n', ' ');
+
+/// Swipe a message to the right to reply to it (own and received messages).
+/// The bubble follows the finger up to [_max] px; past [_trigger] a reply
+/// icon fills in, the phone ticks once, and letting go starts the reply.
+class _SwipeToReply extends StatefulWidget {
+  const _SwipeToReply({super.key, required this.onReply, required this.child});
+
+  final VoidCallback onReply;
+  final Widget child;
+
+  @override
+  State<_SwipeToReply> createState() => _SwipeToReplyState();
+}
+
+class _SwipeToReplyState extends State<_SwipeToReply> with SingleTickerProviderStateMixin {
+  static const double _trigger = 56;
+  static const double _max = 80;
+
+  late final AnimationController _back = AnimationController(vsync: this, duration: const Duration(milliseconds: 180))
+    ..addListener(() => setState(() => _dx = _releaseDx * (1 - _back.value)));
+  double _dx = 0;
+  double _releaseDx = 0;
+  bool _armed = false;
+
+  @override
+  void dispose() {
+    _back.dispose();
+    super.dispose();
+  }
+
+  void _update(DragUpdateDetails d) {
+    if (_back.isAnimating) _back.stop();
+    final next = (_dx + d.delta.dx).clamp(0.0, _max);
+    final armed = next >= _trigger;
+    if (armed && !_armed) unawaited(HapticFeedback.selectionClick());
+    setState(() {
+      _dx = next;
+      _armed = armed;
+    });
+  }
+
+  void _end([DragEndDetails? _]) {
+    if (_armed) widget.onReply();
+    _armed = false;
+    _releaseDx = _dx;
+    unawaited(_back.forward(from: 0));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = (_dx / _trigger).clamp(0.0, 1.0);
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragUpdate: _update,
+      onHorizontalDragEnd: _end,
+      onHorizontalDragCancel: _end,
+      child: Stack(
+        alignment: Alignment.centerLeft,
+        children: [
+          if (_dx > 0)
+            Positioned(
+              left: 4,
+              child: Opacity(
+                opacity: progress,
+                child: Transform.scale(
+                  scale: 0.6 + 0.4 * progress,
+                  child: Icon(Icons.reply, color: Theme.of(context).colorScheme.primary),
+                ),
+              ),
+            ),
+          Transform.translate(offset: Offset(_dx, 0), child: widget.child),
+        ],
+      ),
+    );
+  }
+}
 
 class _ReplyPreview extends StatelessWidget {
   const _ReplyPreview({required this.message, required this.peerName, required this.onCancel});

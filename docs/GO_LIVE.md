@@ -19,7 +19,7 @@ marked **(you)** need a decision or an account only you have.
 
 ## 2. Supabase
 
-- [ ] All four migrations run (`supabase/migrations/*.sql`, in name order).
+- [ ] All five migrations run (`supabase/migrations/*.sql`, in name order).
 - [ ] Edge Functions deployed (`scripts\deploy-functions.ps1`); delete the
   personal access token afterwards (Account > Access Tokens).
 - [ ] **Custom SMTP** configured. The built-in sender delivers only to team
@@ -76,7 +76,8 @@ Nothing below has been tested end to end on devices yet. Use two phones (or
 one phone and an emulator with a "Google Play" image) and two accounts.
 
 - [ ] Register both, find each other by username, chat both ways; receipts.
-- [ ] Photo from gallery and camera; reply; delete for everyone; search.
+- [ ] Photo from gallery and camera; reply by swiping a message right (own
+  and received) and by long-press; delete for everyone; search.
 - [ ] Notification with BVM closed, within seconds (Firebase) and without
   Firebase (up to 15 minutes).
 - [ ] Display name and profile picture appear on the other phone.
@@ -98,9 +99,37 @@ one phone and an emulator with a "Google Play" image) and two accounts.
   the server.
 - APK installs do not update themselves; tell people when a new version is out.
 
+## 7. Capacity (limited public release)
+
+The Free plan is enough for a limited release (roughly a few hundred active
+users). What fills up, and what BVM does about it (plan limits as of
+November 2026; check [supabase.com/pricing](https://supabase.com/pricing)):
+
+| Resource (Free plan) | BVM usage | Guard |
+|---|---|---|
+| Database 500 MB | Directory, keys (~100 one-time keys per user, a few KB), account backups (16 KB per user), **undelivered envelopes** | Inbox quota 10 MB per recipient / 3 MB per sender-recipient pair; text 30 days, photos 7, receipts 3; inactive phones (30 days) purged. Delivered envelopes are deleted at once. |
+| Egress 5 GB / month | Mostly photo parts (~300 KB per photo, sent once, fetched once) | Photos shrunk before sending. |
+| Edge Function calls 500k / month | One `push` call per sent batch | Pushes coalesced to one per recipient per 5 s. |
+| Realtime 200 concurrent | One connection per open app | Closed apps use push / the 15-minute check instead. |
+| Auth e-mails | Your SMTP provider's limit | Supabase limit: 30 new users per hour (raise in Authentication > Rate Limits). |
+
+Watch Reports > Database size in the dashboard. Worst case for undelivered
+data is 10 MB times the number of users who stopped opening the app for
+less than 30 days; with 100 such users that is 1 GB, so if you grow past a
+few hundred users, either lower the quota in
+`private.assert_inbox_space` (one SQL statement) or move to the Pro plan
+(8 GB database, no pausing, about US$25 per month). No app change is needed
+for either.
+
+Check the current size of waiting data any time (SQL Editor):
+
+```sql
+select pg_size_pretty(sum(octet_length(ciphertext))) as waiting, count(*) as envelopes
+  from public.relay;
+```
+
 ## Not done yet (later)
 
-- CAPTCHA on sign-up (Supabase supports it; the app needs a CAPTCHA widget).
 - Phone-number verification (paid SMS/WhatsApp OTP).
 - In-app "new version available" check for sideloaded APKs.
 - Google Play (docs/PLAY_RELEASE.md) and iOS (docs/IOS.md).

@@ -14,12 +14,13 @@ Status: **milestone M1 (release APK), feature update v2**. See
 |---|---|
 | 1-to-1 text chat | End-to-end encrypted with Olm (Double Ratchet) via the audited vodozemac library. Up to 4000 characters per message. |
 | Photos (images only) | Gallery or camera. Before encryption the photo is rotated upright, **stripped of all metadata** (GPS location, camera, time) and shrunk to at most 1600 px / about 300 KB. It travels in encrypted parts of 30 KB through the same relay as messages and is deleted from the server on delivery, at the latest after **7 days** (text: 30 days). No storage bucket, no "save to gallery". |
-| Reply to a message | Long-press > Reply. Only the id of the original travels, never a copy of its text, so a reply cannot keep an expired message alive. If the original is gone the quote says "Message no longer available". |
+| Reply to a message | **Swipe the message to the right** (yours or theirs), or long-press > Reply. Only the id of the original travels, never a copy of its text, so a reply cannot keep an expired message alive. If the original is gone the quote says "Message no longer available". |
 | Delete a message | Long-press > Delete for me (this phone), or Delete for everyone (your own messages; an encrypted delete command removes it from the other phone too). |
 | Copy text | Long-press > Copy text. |
 | Message search | Search icon in the chat list (all chats) or in a chat (that chat only). Runs only on the phone, over text messages; tap a result to jump to the message. |
 | Delivery and read receipts | ✓ sent, ✓✓ delivered, blue ✓✓ read. Not sent for message requests. |
 | Offline queue | Messages written offline are encrypted at once and sent when the connection is back. |
+| Bounded server storage | Undelivered data per recipient is capped at 10 MB (3 MB from any one sender). When someone's inbox is full because they haven't opened BVM, new messages wait encrypted in the **sender's** outbox (shown with the clock icon) and go out automatically once there is room. Receipts expire after 3 days, photos after 7, text after 30; everything waiting for a phone that hasn't connected for 30 days is deleted. |
 
 ### Profile
 | Feature | How it works |
@@ -151,7 +152,7 @@ Keep the project outside OneDrive (sync corrupts Gradle/Cargo outputs).
 ## 2. Supabase (free tier)
 
 1. Create a project at supabase.com (no card needed).
-2. **Schema:** in the SQL Editor run the four migration files, in this order
+2. **Schema:** in the SQL Editor run the five migration files, in this order
    (each: paste > Run):
    1. `supabase/migrations/20261031000000_bvm_init.sql`: tables with RLS, RPCs,
       Realtime publication, 5-minute TTL job, phone-encryption key in Vault.
@@ -162,6 +163,8 @@ Keep the project outside OneDrive (sync corrupts Gradle/Cargo outputs).
       encrypted account backup (passwords and contacts survive a new sign-in).
    4. `supabase/migrations/20261118000000_bvm_v4_rate_limits.sql`: per-account
       rate limits on lookups, key claims, sending, reports and backups.
+   5. `supabase/migrations/20261119000000_bvm_v5_inbox_quota.sql`: inbox quota
+      and shorter lifetimes, so undelivered messages cannot fill the database.
 
    A project that already ran the earlier files only needs the newer ones. All
    are safe to run again. With the CLI instead: `npx supabase link --project-ref <ref>`
@@ -258,7 +261,7 @@ The script creates the upload keystore on first use
 random password in `android\key.properties`, both git-ignored), regenerates the
 Drift code, runs the tests, builds an obfuscated, R8-shrunk release APK with
 `--dart-define-from-file=.env`, and writes `dist\bvm-<version>-release.apk`
-(for example `bvm-1.1.0-2-release.apk`; the version comes from `pubspec.yaml`) plus
+(for example `bvm-1.2.0-3-release.apk`; the version comes from `pubspec.yaml`) plus
 a `.sha256` file. **Back up `.secrets\` and `android\key.properties` offline**;
 updates must be signed with the same key. Use `-SplitPerAbi` for smaller
 per-architecture APKs, `-SkipTests` to skip the tests.
@@ -268,7 +271,7 @@ Without `.env`, the APK builds but opens a "not configured" screen.
 ## 5. Install
 
 * **adb:** enable Developer options > USB debugging on the phone, connect it, then
-  `.\.toolchain\android-sdk\platform-tools\adb.exe install -r dist\bvm-1.1.0-2-release.apk`
+  `.\.toolchain\android-sdk\platform-tools\adb.exe install -r dist\bvm-1.2.0-3-release.apk`
 * **Direct transfer:** copy the APK to the phone (USB, cable, local share), open
   it in Files and allow "Install unknown apps" for that app when Android asks.
   Compare the SHA-256 from the `.sha256` file if the transfer path is not trusted.
@@ -319,12 +322,15 @@ yet; their server side is covered by `rls_v2_test.sql`.
 2. Run the migrations you have not run yet in the SQL Editor (once each, in
    order): `20261115000000_bvm_v2_features.sql`,
    `20261116000000_bvm_v3_account_backup.sql`,
-   `20261118000000_bvm_v4_rate_limits.sql`.
+   `20261118000000_bvm_v4_rate_limits.sql`,
+   `20261119000000_bvm_v5_inbox_quota.sql`.
 3. Redeploy the Edge Functions (`scripts\deploy-functions.ps1`, add
    `-ServiceAccount <json>` only to replace the Firebase key).
 4. Rebuild: `powershell -ExecutionPolicy Bypass -File scripts\build-apk.ps1 -SkipTests`
    and install the APK over the old one (same signing key). The local
    database upgrades itself to schema v3; chats and messages are kept.
+   Installing over the old APK keeps everything; never uninstall first (that
+   erases the chat history on that phone).
 5. Unlock the app once on each phone: that creates the encrypted account
    backup. Only after that does a new sign-in restore passwords and contacts.
 

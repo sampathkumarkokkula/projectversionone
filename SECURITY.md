@@ -265,6 +265,11 @@ the phone uploads an encrypted backup to `private.account_backups` (RPCs
   SQLSTATE BVM05. Someone with many accounts gets proportionally more, bounded
   by the Auth sign-up and OTP limits. Draining a user's one-time keys remains
   possible slowly; the fallback key keeps sessions possible.
+* Inbox quota (v5 migration): at most 10 MB of undelivered messages per
+  recipient and 3 MB per sender. Over it, senders keep messages in their own
+  outbox and retry. Four or more accounts could fill someone's inbox and delay
+  other senders until the recipient opens the app (which empties it) or the
+  data expires; blocking the senders removes their queued data at once.
 * Spam suspension can be abused by 5 coordinated accounts (each older than a
   day). The operator can lift a suspension (README section 2). A changed
   username becomes free immediately, so someone else can register it; existing

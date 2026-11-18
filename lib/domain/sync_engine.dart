@@ -181,7 +181,11 @@ class SyncEngine {
     final pushIds = <String>[];
     try {
       final entries = await db.outboxInOrder();
+      // Recipients whose server inbox is full: their envelopes wait on this
+      // phone (in order) until the next pass; others still go out.
+      final inboxFull = <String>{};
       for (final entry in entries) {
+        if (inboxFull.contains(entry.recipientId)) continue;
         final expiresAt = entry.expiresAt;
         if (expiresAt != null && expiresAt <= clock.nowMs()) {
           // Already expired on this phone: never deliver it.
@@ -198,6 +202,9 @@ class SyncEngine {
               expiresAtMs: expiresAt,
             ),
           );
+        } on RecipientInboxFullException {
+          inboxFull.add(entry.recipientId);
+          continue;
         } on RecipientGoneException {
           await db.removeOutbox(entry.id);
           final messageId = entry.messageId;

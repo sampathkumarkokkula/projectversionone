@@ -91,6 +91,12 @@ class OutgoingEnvelope {
   final int? expiresAtMs;
 }
 
+/// The recipient has too much undelivered data waiting on the server
+/// (SQLSTATE BVM06). The envelope stays in the outbox and is retried later.
+class RecipientInboxFullException implements Exception {
+  const RecipientInboxFullException();
+}
+
 /// The recipient no longer exists on the server (account deleted).
 class RecipientGoneException implements Exception {
   const RecipientGoneException();
