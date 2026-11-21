@@ -152,8 +152,12 @@ Keep the project outside OneDrive (sync corrupts Gradle/Cargo outputs).
 ## 2. Supabase (free tier)
 
 1. Create a project at supabase.com (no card needed).
-2. **Schema:** in the SQL Editor run the five migration files, in this order
-   (each: paste > Run):
+2. **Schema:** in the SQL Editor (New query) paste the whole of
+   **`supabase/bvm_all_in_one.sql`** and press Run. That one file contains the
+   five migrations below, in order; it is safe to run again, so it also
+   upgrades an existing project. (After changing a migration, regenerate it
+   with `scripts\combine-migrations.ps1`.) Or run the five files one by one,
+   in this order (each: paste > Run):
    1. `supabase/migrations/20261031000000_bvm_init.sql`: tables with RLS, RPCs,
       Realtime publication, 5-minute TTL job, phone-encryption key in Vault.
    2. `supabase/migrations/20261115000000_bvm_v2_features.sql`: username
