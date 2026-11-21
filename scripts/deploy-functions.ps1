@@ -21,6 +21,8 @@
 [CmdletBinding()]
 param(
     [string] $ServiceAccount,
+    # Overrides the project taken from SUPABASE_URL in .env.
+    [string] $ProjectRef,
     [string] $CliVersion = '3.1.0'
 )
 
