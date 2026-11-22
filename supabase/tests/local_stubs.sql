@@ -13,7 +13,7 @@ alter default privileges in schema public grant all on tables to anon, authentic
 alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
 
 create schema auth;
-create table auth.users (id uuid primary key, email text);
+create table auth.users (id uuid primary key, email text, created_at timestamptz not null default now());
 -- Same contract as Supabase: the JWT subject of the current request.
 create function auth.uid() returns uuid
 language sql stable

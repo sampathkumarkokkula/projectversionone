@@ -24,11 +24,27 @@ crash reports. Raise `version:` in `pubspec.yaml` for every upload.
 
 ## Store listing requirements
 
-* **Privacy policy URL**: host `PRIVACY_POLICY.md` publicly (for example GitHub
-  Pages, free) after filling in the placeholders.
+* **Graphics** (made by `scripts\make-store-assets.ps1`, in `docs\store\`):
+  app icon `icon-512.png` (512 x 512) and feature graphic
+  `feature-graphic-1024x500.png`. You still need **at least 2 phone
+  screenshots** (chat list, a chat, settings). Release builds block
+  screenshots, so run a debug build on the emulator
+  (`flutter run --dart-define-from-file=.env`) with two test accounts and use
+  the emulator's camera button. Never show real conversations.
+* **Texts** (suggestions):
+  * Short description (max 80 characters): `Private 1-to-1 messenger. End-to-end encrypted. History only on your phones.`
+  * Full description: what it does (1-to-1 text and photos, auto-delete
+    timers, secondary password, screenshots blocked, no contact upload, no
+    ads or tracking), and that chat history is never backed up.
+* **Category**: Communication. **Contact e-mail**: the one in the privacy
+  policy.
+* **Privacy policy URL**: a public link to the policy. Simplest: make the
+  repository public and use the GitHub link of `PRIVACY_POLICY.md`, or turn
+  on GitHub Pages. The text in the app comes from the same file.
 * **Account deletion**: the in-app "Delete my account" exists. Play also
-  requires a **web link** where users can request deletion without the app
-  (a simple page or a monitored e-mail address is accepted).
+  requires a **web link** where users can request deletion without the app.
+  The privacy policy's "Your rights" section (deletion by e-mail) at its
+  public URL is enough; enter that URL.
 * **Target API level**: targetSdk 36 (Flutter 3.47 default) meets the 2026
   requirement.
 * **Content rating** questionnaire: messaging app with user-to-user

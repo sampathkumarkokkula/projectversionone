@@ -13,6 +13,27 @@ import '../domain/models.dart';
 import '../domain/wipe_service.dart';
 import 'backup_service.dart';
 
+/// A sign-in code was requested too often, or too many wrong codes were typed.
+class OtpLimitException implements Exception {
+  OtpLimitException.wait(Duration wait)
+      : message = 'Please wait ${_format(wait)} before requesting another code.';
+
+  const OtpLimitException.tooManyWrongCodes()
+      : message = 'Too many wrong codes. Request a new code.';
+
+  final String message;
+
+  static String _format(Duration d) {
+    final s = d.inSeconds + (d.inMilliseconds % 1000 > 0 ? 1 : 0);
+    if (s < 60) return '$s s';
+    final m = (s / 60).ceil();
+    return m == 1 ? '1 minute' : '$m minutes';
+  }
+
+  @override
+  String toString() => message;
+}
+
 /// Registration, new-device sign-in (with backup restore), password reset,
 /// profile (username, display name, picture), and key upkeep.
 class AccountService {
@@ -73,14 +94,75 @@ class AccountService {
   // Onboarding
   // ---------------------------------------------------------------------------
 
-  Future<void> sendSignInCode(String email) =>
-      backend.sendEmailCode(normalizeEmail(email), createUser: true);
+  // ---------------------------------------------------------------------------
+  // Sign-in code limits on this phone. The server (Supabase Auth rate limits,
+  // see docs/GO_LIVE.md) enforces its own; these stop the app itself from
+  // sending e-mails in a loop and make code guessing pointless.
+  // ---------------------------------------------------------------------------
+
+  static const _otpSendsKey = 'otp.sends';
+  static const _otpFailsKey = 'otp.fails';
+  static const Duration otpResendWait = Duration(seconds: 60);
+  static const int _otpSendsPerHour = 5;
+  static const int _otpWrongCodesAllowed = 5;
+
+  Future<List<int>> _recentOtpSends(int now) async {
+    final raw = await db.read(_otpSendsKey);
+    if (raw == null) return [];
+    try {
+      return [
+        for (final v in jsonDecode(raw) as List<dynamic>)
+          if (v is int && now - v < const Duration(hours: 1).inMilliseconds && v <= now) v,
+      ];
+    } on FormatException {
+      return [];
+    }
+  }
+
+  /// How long until another code may be requested (zero when allowed now).
+  Future<Duration> otpWaitRemaining() async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final sends = await _recentOtpSends(now);
+    if (sends.isEmpty) return Duration.zero;
+    final last = sends.reduce((a, b) => a > b ? a : b);
+    var waitMs = otpResendWait.inMilliseconds - (now - last);
+    if (sends.length >= _otpSendsPerHour) {
+      final oldest = sends.reduce((a, b) => a < b ? a : b);
+      final hourWait = const Duration(hours: 1).inMilliseconds - (now - oldest);
+      if (hourWait > waitMs) waitMs = hourWait;
+    }
+    return Duration(milliseconds: waitMs < 0 ? 0 : waitMs);
+  }
+
+  Future<void> _sendCodeLimited(String email, {required bool createUser}) async {
+    final wait = await otpWaitRemaining();
+    if (wait > Duration.zero) throw OtpLimitException.wait(wait);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final sends = await _recentOtpSends(now);
+    await backend.sendEmailCode(email, createUser: createUser);
+    await db.write(_otpSendsKey, jsonEncode([...sends, now]));
+    await db.write(_otpFailsKey, '0');
+  }
+
+  Future<void> _verifyCodeLimited(String email, String code) async {
+    final fails = int.tryParse(await db.read(_otpFailsKey) ?? '0') ?? 0;
+    if (fails >= _otpWrongCodesAllowed) throw const OtpLimitException.tooManyWrongCodes();
+    try {
+      await backend.verifyEmailCode(email, code.trim());
+    } on Object {
+      await db.write(_otpFailsKey, '${fails + 1}');
+      rethrow;
+    }
+    await db.write(_otpFailsKey, '0');
+  }
+
+  Future<void> sendSignInCode(String email) => _sendCodeLimited(normalizeEmail(email), createUser: true);
 
   /// Verifies the code and returns the existing profile (new device) or null
   /// (a username still has to be chosen).
   Future<MyProfile?> verifySignInCode(String email, String code) async {
     final normalized = normalizeEmail(email);
-    await backend.verifyEmailCode(normalized, code.trim());
+    await _verifyCodeLimited(normalized, code);
     await db.write(_selfEmail, normalized);
     final profile = await backend.myProfile();
     _remoteBackup = null;
@@ -228,7 +310,7 @@ class AccountService {
   Future<void> sendResetCode() async {
     final email = await db.read(_selfEmail);
     if (email == null) throw StateError('no e-mail on record');
-    await backend.sendEmailCode(email, createUser: false);
+    await _sendCodeLimited(email, createUser: false);
   }
 
   /// Signs this phone in again after the server session was lost, without
@@ -236,7 +318,7 @@ class AccountService {
   Future<void> reconnect(String code) async {
     final email = await db.read(_selfEmail);
     if (email == null) throw StateError('no e-mail on record');
-    await backend.verifyEmailCode(email, code.trim());
+    await _verifyCodeLimited(email, code);
     if (backend.userId != await db.read(_selfId)) {
       await backend.signOutLocally();
       throw StateError('the code belongs to a different account');
@@ -252,7 +334,7 @@ class AccountService {
     final email = await db.read(_selfEmail);
     if (email == null) throw StateError('no e-mail on record');
     LockService.validate(mainPassword);
-    await backend.verifyEmailCode(email, code.trim());
+    await _verifyCodeLimited(email, code);
     if (backend.userId != await db.read(_selfId)) {
       throw StateError('the code belongs to a different account');
     }

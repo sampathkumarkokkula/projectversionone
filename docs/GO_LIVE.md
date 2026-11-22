@@ -19,17 +19,38 @@ marked **(you)** need a decision or an account only you have.
 
 ## 2. Supabase
 
-- [ ] All five migrations run (`supabase/migrations/*.sql`, in name order).
+- [ ] Database set up: `supabase/bvm_all_in_one.sql` run in the SQL Editor
+  (contains all six migrations).
 - [ ] Edge Functions deployed (`scripts\deploy-functions.ps1`); delete the
   personal access token afterwards (Account > Access Tokens).
 - [ ] **Custom SMTP** configured. The built-in sender delivers only to team
   members and is limited to about 2 e-mails per hour.
-- [ ] Authentication > Rate Limits: with custom SMTP the default is 30 new
-  users per hour; raise it before announcing the app widely.
-- [ ] Authentication > Sign In / Providers > Email: shorten the OTP expiry
-  (for example 600 seconds).
-- [ ] Optional: Authentication > Hooks > *Before User Created* >
-  `public.bvm_before_user_created` (banned addresses get no code at all).
+- [ ] **Sign-up hook (required against sign-up spam):** Authentication >
+  Hooks > *Before User Created* > Postgres > `public.bvm_before_user_created`.
+  It refuses banned and throw-away e-mail domains and enforces the sign-up
+  caps from the v6 migration (30 per hour, 150 per day, 1000 accounts in
+  total), so spam sign-ups get no e-mail at all. Raise a cap later with e.g.
+  `update private.settings set value = 2000 where key = 'max_accounts';`
+- [ ] **Authentication > Rate Limits** (per-e-mail and per-IP limits that
+  stop code-e-mail spam and code guessing):
+
+  | Setting | Value |
+  |---|---|
+  | Rate limit for sending emails | 30 per hour |
+  | Rate limit for sign-ups and sign-ins (per IP) | 15 per 5 minutes |
+  | Rate limit for token verifications (per IP) | 15 per 5 minutes |
+  | Rate limit for token refreshes (per IP) | default (150 per 5 minutes) |
+  | Rate limit for anonymous users | 0 / leave anonymous sign-ins off |
+
+  Mobile networks put many phones behind one IP address, so don't go much
+  lower than 15.
+- [ ] **Authentication > Sign In / Providers > Email**: OTP expiry 600
+  seconds; minimum interval between e-mails to the same address 60 seconds
+  (default). Leave every other provider (phone, Google, anonymous, ...)
+  disabled.
+- [ ] The app adds its own limits: a new code at most every 60 seconds and 5
+  per hour from one phone, and 5 wrong codes before a new code is needed.
+  Unfinished sign-ups are deleted after 24 hours.
 - [ ] **Pausing.** Free projects with too little database activity in 7 days
   are paused, which takes BVM offline until you press *Resume project*. Either
   set up the keep-alive job (add the repository secrets `SUPABASE_URL` and
@@ -56,8 +77,10 @@ marked **(you)** need a decision or an account only you have.
 - [ ] Optional hardening: Google Cloud console > APIs & Services >
   Credentials > the Android API key > restrict it to Android apps
   (`app.bvm.messenger` plus the SHA-1 of your upload key, from
-  `keytool -list -v -keystore .secrets\upload-keystore.jks`). Check
-  Settings > Notifications says "registered" afterwards.
+  `keytool -list -v -keystore .secrets\upload-keystore.jks`; for Play
+  installs also add the **app signing key** SHA-1 from Play Console > Test
+  and release > Setup > App signing). Check that a message to a closed app
+  still shows a notification afterwards.
 
 ## 4. Releases
 
@@ -99,7 +122,48 @@ one phone and an emulator with a "Google Play" image) and two accounts.
   the server.
 - APK installs do not update themselves; tell people when a new version is out.
 
-## 7. Capacity (limited public release)
+## 7. Secrets: what to keep, and where
+
+| Item | Secret? | Where it lives | Keep a copy? |
+|---|---|---|---|
+| `.secrets\upload-keystore.jks` | **Yes** | Build laptop (git-ignored) | **Yes, 2 offline copies.** Without it no update can be uploaded (Play can reset an upload key, but only after a support request). |
+| `android\key.properties` (keystore passwords) | **Yes** | Build laptop (git-ignored) | **Yes**, with the keystore. |
+| Firebase service-account JSON | **Yes**, full push rights | Supabase secret `FCM_SERVICE_ACCOUNT` | No. Delete the download after deploying; generate a new key if you ever need it. |
+| Supabase personal access token (`sbp_...`) | **Yes**, controls your projects | Nowhere | No. Create it for a deploy, delete it afterwards. |
+| Supabase **secret** key (`sb_secret_...`) | **Yes**, bypasses all security | Supabase only | No. Never put it in `.env` or the app. |
+| Supabase database password | **Yes** | Password manager | Yes. |
+| SMTP / Gmail app password | **Yes** | Supabase SMTP settings | Password manager (or create a new one). |
+| Supabase, Firebase/Google, GitHub, Play Console logins | **Yes** | Password manager, with 2-step verification on | Yes. |
+| `.env`: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `FIREBASE_*`, `SOURCE_CODE_URL` | No: built into the app, anyone can read them from the APK | Build laptop (git-ignored) | Yes, so you can rebuild; Row Level Security and the rate limits protect the server, not these values. |
+| `google-services.json` | No (same values as `FIREBASE_*`) | Nowhere needed | No. |
+| `build\symbols\` of each release | No | Build laptop | Yes, to read crash reports. |
+
+How to store them:
+
+- **Password manager** (Bitwarden is free, or KeePassXC offline): the account
+  logins, the database password, the SMTP password, and the two values in
+  `android\key.properties`. Attach `upload-keystore.jks` as a file there as
+  well.
+- **Offline copy**: put `.secrets\upload-keystore.jks`, `android\key.properties`
+  and `.env` into an encrypted archive (7-Zip > Add to archive > AES-256, with
+  a strong password from the password manager) and keep it on a USB stick
+  and in one more place (for example a second drive or your private cloud
+  drive; it's encrypted).
+- **Never** commit them or send them in chat or e-mail. `.gitignore` already
+  excludes `.env`, `.secrets/`, `*.jks`, `android/key.properties`,
+  `google-services.json` and `*firebase-adminsdk*.json`; run `git status`
+  before every commit to be sure.
+- **GitHub keep-alive job**: `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` go
+  into repository Settings > Secrets and variables > Actions, not into a
+  file.
+
+If one leaks: Firebase key: delete it in Google Cloud console > IAM >
+Service accounts > Keys, generate a new one and rerun `deploy-functions.ps1
+-ServiceAccount`. Supabase token: delete it under Account > Access Tokens.
+Secret key or database password: rotate it in Project Settings. Keystore:
+with Play App Signing, ask Play support to reset the upload key.
+
+## 8. Capacity (limited public release)
 
 The Free plan is enough for a limited release (roughly a few hundred active
 users). What fills up, and what BVM does about it (plan limits as of

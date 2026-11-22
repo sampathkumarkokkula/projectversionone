@@ -218,7 +218,8 @@ the phone uploads an encrypted backup to `private.account_backups` (RPCs
 
 ## 5. Other hardening
 
-* `FLAG_SECURE` blocks screenshots, screen recording and casting; recents
+* `FLAG_SECURE` blocks screenshots, screen recording and casting in release
+  builds (debuggable `flutter run` builds skip it for store screenshots); recents
   thumbnails are blank (`setRecentsScreenshotEnabled(false)` on Android 13+),
   plus an in-app cover while the app is inactive.
 * All text fields ask the keyboard for incognito mode
@@ -284,5 +285,5 @@ the phone uploads an encrypted backup to `private.account_backups` (RPCs
 
 ## 7. Reporting a vulnerability
 
-Send details to [security contact e-mail]. Please do not open public issues
+Send details to bvm.apps.official@gmail.com. Please do not open public issues
 for security problems.

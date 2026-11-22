@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- BVM launcher icon foreground: a chat bubble with a keyhole. 108 dp
+     adaptive-icon canvas; the artwork stays inside the 66 dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M40,32H68A10,10 0,0 1,78 42V58A10,10 0,0 1,68 68H48L38,76V68A10,10 0,0 1,30 58V42A10,10 0,0 1,40 32Z M51.6,50.45A5.5,5.5 0,1 1,56.4 50.45L58,60H50Z" />
+</vector>

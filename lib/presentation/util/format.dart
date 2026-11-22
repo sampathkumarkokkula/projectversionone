@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../app/account_service.dart' show OtpLimitException;
 import '../../data/media/image_processor.dart';
 import '../../data/remote/supabase_backend.dart';
 import '../../domain/lock_service.dart';
@@ -31,6 +32,7 @@ String formatListTime(BuildContext context, int epochMs) {
 /// User-facing text for an error. Never includes server payloads or secrets.
 String describeError(Object error) {
   if (error is PasswordPolicyException) return error.message;
+  if (error is OtpLimitException) return error.message;
   if (error is UsernameTakenException) return 'That username is already taken.';
   if (error is SelfChatException) return 'That is your own username.';
   if (error is UsernameChangeTooSoonException) return 'You can change your username once every 24 hours.';

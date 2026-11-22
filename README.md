@@ -50,11 +50,10 @@ Status: **milestone M1 (release APK), feature update v2**. See
 ### Notifications
 | Feature | How it works |
 |---|---|
-| New-message alerts | **On by default, no setup needed.** They only say "BVM - New message": never who wrote or what, and they are hidden on a secure lock screen. Android 13+ asks for permission after the first unlock (Settings > Notifications shows the state). |
+| New-message alerts | **On by default, no setup needed.** They only say "BVM - New message": never who wrote or what, and they are hidden on a secure lock screen. Android 13+ asks for permission after the first unlock (Android Settings > Apps > BVM > Notifications to change it later). |
 | App open in the background | Alert as soon as the message arrives (Realtime). |
 | App closed | A background task asks the server every ~15 minutes, with a random per-phone token and no login session, whether messages wait. Android may delay it in battery saving. |
 | Instant alerts when closed (optional) | Configure Firebase Cloud Messaging (section 3, about 10 minutes, free); the push carries no content. |
-| Push diagnostics | Settings > Notifications shows whether instant push is in this build, registered or failed (with the error), and "Send a test notification" shows a local test alert. No alert is shown while BVM is on screen. |
 
 ### Privacy and the app lock
 | Feature | How it works |
@@ -154,9 +153,9 @@ Keep the project outside OneDrive (sync corrupts Gradle/Cargo outputs).
 1. Create a project at supabase.com (no card needed).
 2. **Schema:** in the SQL Editor (New query) paste the whole of
    **`supabase/bvm_all_in_one.sql`** and press Run. That one file contains the
-   five migrations below, in order; it is safe to run again, so it also
+   six migrations below, in order; it is safe to run again, so it also
    upgrades an existing project. (After changing a migration, regenerate it
-   with `scripts\combine-migrations.ps1`.) Or run the five files one by one,
+   with `scripts\combine-migrations.ps1`.) Or run the six files one by one,
    in this order (each: paste > Run):
    1. `supabase/migrations/20261031000000_bvm_init.sql`: tables with RLS, RPCs,
       Realtime publication, 5-minute TTL job, phone-encryption key in Vault.
@@ -169,6 +168,9 @@ Keep the project outside OneDrive (sync corrupts Gradle/Cargo outputs).
       rate limits on lookups, key claims, sending, reports and backups.
    5. `supabase/migrations/20261119000000_bvm_v5_inbox_quota.sql`: inbox quota
       and shorter lifetimes, so undelivered messages cannot fill the database.
+   6. `supabase/migrations/20261122000000_bvm_v6_signup_limits.sql`: sign-up
+      caps (per hour, per day, total accounts), removal of unfinished
+      sign-ups after 24 hours, limits on the remaining lookups.
 
    A project that already ran the earlier files only needs the newer ones. All
    are safe to run again. With the CLI instead: `npx supabase link --project-ref <ref>`
@@ -265,7 +267,7 @@ The script creates the upload keystore on first use
 random password in `android\key.properties`, both git-ignored), regenerates the
 Drift code, runs the tests, builds an obfuscated, R8-shrunk release APK with
 `--dart-define-from-file=.env`, and writes `dist\bvm-<version>-release.apk`
-(for example `bvm-1.2.0-3-release.apk`; the version comes from `pubspec.yaml`) plus
+(for example `bvm-1.3.0-4-release.apk`; the version comes from `pubspec.yaml`) plus
 a `.sha256` file. **Back up `.secrets\` and `android\key.properties` offline**;
 updates must be signed with the same key. Use `-SplitPerAbi` for smaller
 per-architecture APKs, `-SkipTests` to skip the tests.
@@ -275,7 +277,7 @@ Without `.env`, the APK builds but opens a "not configured" screen.
 ## 5. Install
 
 * **adb:** enable Developer options > USB debugging on the phone, connect it, then
-  `.\.toolchain\android-sdk\platform-tools\adb.exe install -r dist\bvm-1.2.0-3-release.apk`
+  `.\.toolchain\android-sdk\platform-tools\adb.exe install -r dist\bvm-1.3.0-4-release.apk`
 * **Direct transfer:** copy the APK to the phone (USB, cable, local share), open
   it in Files and allow "Install unknown apps" for that app when Android asks.
   Compare the SHA-256 from the `.sha256` file if the transfer path is not trusted.
@@ -327,7 +329,9 @@ yet; their server side is covered by `rls_v2_test.sql`.
    order): `20261115000000_bvm_v2_features.sql`,
    `20261116000000_bvm_v3_account_backup.sql`,
    `20261118000000_bvm_v4_rate_limits.sql`,
-   `20261119000000_bvm_v5_inbox_quota.sql`.
+   `20261119000000_bvm_v5_inbox_quota.sql`,
+   `20261122000000_bvm_v6_signup_limits.sql`
+   (or simply run `supabase/bvm_all_in_one.sql` again).
 3. Redeploy the Edge Functions (`scripts\deploy-functions.ps1`, add
    `-ServiceAccount <json>` only to replace the Firebase key).
 4. Rebuild: `powershell -ExecutionPolicy Bypass -File scripts\build-apk.ps1 -SkipTests`

@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/account_deletion.dart';
 import '../../core/env.dart';
 import '../../data/local/app_database.dart' show selfAvatarId;
-import '../../data/push/push_service.dart' show PushState;
 import '../providers.dart';
 import '../session_controller.dart';
 import '../util/format.dart';
@@ -76,9 +75,6 @@ class SettingsScreen extends ConsumerWidget {
             onTap: replaced ? null : () => changeUsernameDialog(context, ref, username ?? ''),
           ),
           const Divider(),
-          const _Header('Notifications'),
-          const _NotificationsTile(),
-          const Divider(),
           const _Header('Safety'),
           ListTile(
             leading: const Icon(Icons.block),
@@ -105,10 +101,7 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const Divider(),
           const _Header('Privacy'),
-          const _Fact(
-            Icons.enhanced_encryption_outlined,
-            'Messages and photos are end-to-end encrypted (Olm / Double Ratchet).',
-          ),
+          const _Fact(Icons.enhanced_encryption_outlined, 'Messages and photos are end-to-end encrypted.'),
           const _Fact(Icons.phone_android, 'Chat history is stored only on your phones, in an encrypted database.'),
           const _Fact(Icons.location_off_outlined, 'Photos are sent without location or camera details.'),
           const _Fact(Icons.screenshot_monitor_outlined, 'Screenshots and screen recording are blocked.'),
@@ -176,92 +169,6 @@ class SettingsScreen extends ConsumerWidget {
       navigator.pop();
       if (context.mounted) showSnack(context, describeError(e));
     }
-  }
-}
-
-class _NotificationsTile extends ConsumerStatefulWidget {
-  const _NotificationsTile();
-
-  @override
-  ConsumerState<_NotificationsTile> createState() => _NotificationsTileState();
-}
-
-class _NotificationsTileState extends ConsumerState<_NotificationsTile> {
-  bool? _enabled;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_refresh());
-  }
-
-  Future<void> _refresh() async {
-    final enabled = await ref.read(servicesProvider).notifications.enabled();
-    if (mounted) setState(() => _enabled = enabled);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = _enabled;
-    final push = ref.read(servicesProvider).push;
-    return Column(
-      children: [
-        ListTile(
-          leading: Icon(enabled == false ? Icons.notifications_off_outlined : Icons.notifications_outlined),
-          title: Text(enabled == false ? 'Notifications are blocked' : 'Notifications are allowed'),
-          subtitle: const Text(
-            'They only say "New message": never who wrote or what. While a chat is open on screen, '
-            'no notification is shown.',
-          ),
-          isThreeLine: true,
-          trailing: enabled == false
-              ? TextButton(
-                  onPressed: () async {
-                    await ref.read(servicesProvider).notifications.requestPermission();
-                    await _refresh();
-                  },
-                  child: const Text('Turn on'),
-                )
-              : null,
-        ),
-        ValueListenableBuilder<PushState>(
-          valueListenable: push.state,
-          builder: (context, state, _) {
-            final (IconData icon, String title, String detail) = switch (state) {
-              PushState.registered => (
-                  Icons.bolt,
-                  'Instant push is on',
-                  'Alerts arrive within seconds, even when BVM is closed.',
-                ),
-              PushState.notInBuild => (
-                  Icons.schedule,
-                  'Instant push is not in this app',
-                  'This APK was built without the Firebase settings, so alerts for a closed app can take '
-                      'up to 15 minutes. Add FIREBASE_* to .env and rebuild (README section 3).',
-                ),
-              PushState.starting => (Icons.hourglass_empty, 'Instant push is starting…', 'Registering with Firebase.'),
-              PushState.failed => (
-                  Icons.error_outline,
-                  'Instant push failed',
-                  '${push.lastError ?? 'Unknown error'}. Alerts for a closed app can take up to 15 minutes.',
-                ),
-            };
-            return ListTile(leading: Icon(icon), title: Text(title), subtitle: Text(detail));
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.notification_add_outlined),
-          title: const Text('Send a test notification'),
-          subtitle: const Text('Shows one now, to check that this phone displays BVM alerts.'),
-          onTap: () async {
-            final notifications = ref.read(servicesProvider).notifications;
-            await notifications.requestPermission();
-            await notifications.show(1);
-            await _refresh();
-          },
-        ),
-      ],
-    );
   }
 }
 

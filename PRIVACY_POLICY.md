@@ -1,23 +1,23 @@
 # BVM Privacy Policy (draft)
 
-Status: draft for review, version 0.1, 31 October 2026. Replace the bracketed
-placeholders before publishing. Google Play requires this text at a public URL.
+Status: draft for review, version 0.1, 31 October 2026.
 
 ## Summary
 
-BVM is a 1-to-1 text messenger. Messages are end-to-end encrypted on your
+BVM is a 1-to-1 messenger for text and photos. Messages are end-to-end encrypted on your
 phone before they leave it. Your chat history is stored only on your phone and
 on the phone of the person you talk to, never on our servers. We cannot read
 your messages.
 
+
 ## Who is responsible
 
-[Operator name, postal address, contact e-mail]
+[BVM, bvm.apps.official@gmail.com]
 
 ## What we store on our servers, and why
 
 | Data | Purpose | How it is stored | How long |
-|---|---|---|---|
+| E-mail address | Sign-in with one-time codes | Supabase Auth, not visible to other users | Until you delete your account; deleted after 24 hours if you request a code but never finish registering |
 | E-mail address | Sign-in with one-time codes | Supabase Auth, not visible to other users | Until you delete your account |
 | Phone number | Collected at registration; verification is planned for a later version | Encrypted (AES-256) in a database area that is not reachable through the API | Until you delete your account |
 | Username | Lets other people find you; this is the only thing others can search for | Public directory | Until you delete your account |
@@ -74,13 +74,10 @@ our servers, and erases all BVM data on your phone. If your account was
 suspended for spam, the hash of its e-mail address stays on the ban list. Copies that the people you chatted with keep on their own
 phones are not affected.
 
-You can also request deletion without the app at [URL or e-mail]. Depending on
+You can also request deletion without the app at bvm.apps.official@gmail.com. Depending on
 where you live you may have further rights (access, correction, objection,
-complaint to a data protection authority). Contact us at [contact e-mail].
+complaint to a data protection authority). Contact us at bvm.apps.official@gmail.com.
 
-## Children
-
-BVM is not directed at children under 13 [or the minimum age in your country].
 
 ## Changes
 
