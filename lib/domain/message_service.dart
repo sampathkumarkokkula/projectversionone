@@ -48,6 +48,7 @@ class BackupChat {
     this.timerSeconds,
     this.timerChangedAt = 0,
     this.blocked = false,
+    this.eraseWithSecondary = false,
   });
 
   final String peerId;
@@ -56,6 +57,7 @@ class BackupChat {
   final int? timerSeconds;
   final int timerChangedAt;
   final bool blocked;
+  final bool eraseWithSecondary;
 
   Map<String, Object?> toJson() => {
         'id': peerId,
@@ -64,6 +66,7 @@ class BackupChat {
         't': timerSeconds,
         'tc': timerChangedAt,
         'b': blocked,
+        'p': eraseWithSecondary,
       };
 
   static BackupChat? fromJson(Object? value) {
@@ -81,6 +84,8 @@ class BackupChat {
       timerSeconds: t is int ? t : null,
       timerChangedAt: tc is int ? tc : 0,
       blocked: value['b'] == true,
+      // Backups from before the selection: timer chats were the protected ones.
+      eraseWithSecondary: value.containsKey('p') ? value['p'] == true : t is int,
     );
   }
 }
@@ -534,6 +539,7 @@ class MessageService {
             timerSeconds: c.timerSeconds,
             timerChangedAt: c.timerChangedAt,
             blocked: c.blocked,
+            eraseWithSecondary: c.eraseWithSecondary,
           ),
       ];
 
@@ -553,6 +559,7 @@ class MessageService {
                 timerSeconds: Value(isAcceptableTimer(saved.timerSeconds) ? saved.timerSeconds : null),
                 timerChangedAt: Value(saved.timerChangedAt),
                 blocked: Value(saved.blocked),
+                eraseWithSecondary: Value(saved.eraseWithSecondary),
                 peerDisplayName: Value(cleanDisplayName(saved.displayName)),
                 directoryCheckedAt: Value(now),
               ),

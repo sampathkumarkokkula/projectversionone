@@ -3,7 +3,7 @@ description: "BVM - private 1-to-1 messenger"
 publish_to: 'none'
 
 # versionName+versionCode for Android (CFBundleShortVersionString+CFBundleVersion on iOS).
-version: 1.3.0+4
+version: 1.4.0+5
 
 environment:
   sdk: ^3.13.7

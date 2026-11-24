@@ -184,6 +184,20 @@ class $ChatsTable extends Chats with TableInfo<$ChatsTable, Chat> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _eraseWithSecondaryMeta =
+      const VerificationMeta('eraseWithSecondary');
+  @override
+  late final GeneratedColumn<bool> eraseWithSecondary = GeneratedColumn<bool>(
+    'erase_with_secondary',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("erase_with_secondary" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     peerId,
@@ -201,6 +215,7 @@ class $ChatsTable extends Chats with TableInfo<$ChatsTable, Chat> {
     refreshProfile,
     directoryCheckedAt,
     peerDisplayName,
+    eraseWithSecondary,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -349,6 +364,15 @@ class $ChatsTable extends Chats with TableInfo<$ChatsTable, Chat> {
         ),
       );
     }
+    if (data.containsKey('erase_with_secondary')) {
+      context.handle(
+        _eraseWithSecondaryMeta,
+        eraseWithSecondary.isAcceptableOrUnknown(
+          data['erase_with_secondary']!,
+          _eraseWithSecondaryMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -418,6 +442,10 @@ class $ChatsTable extends Chats with TableInfo<$ChatsTable, Chat> {
         DriftSqlType.string,
         data['${effectivePrefix}peer_display_name'],
       ),
+      eraseWithSecondary: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}erase_with_secondary'],
+      )!,
     );
   }
 
@@ -465,6 +493,11 @@ class Chat extends DataClass implements Insertable<Chat> {
   /// Name the peer chose to show (from their encrypted profile); null = use
   /// the username.
   final String? peerDisplayName;
+
+  /// Chosen by the user (Settings > Chats erased by the secondary password):
+  /// unlocking with the secondary password deletes this conversation here and
+  /// on the peer's phone.
+  final bool eraseWithSecondary;
   const Chat({
     required this.peerId,
     required this.peerUsername,
@@ -481,6 +514,7 @@ class Chat extends DataClass implements Insertable<Chat> {
     required this.refreshProfile,
     required this.directoryCheckedAt,
     this.peerDisplayName,
+    required this.eraseWithSecondary,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -506,6 +540,7 @@ class Chat extends DataClass implements Insertable<Chat> {
     if (!nullToAbsent || peerDisplayName != null) {
       map['peer_display_name'] = Variable<String>(peerDisplayName);
     }
+    map['erase_with_secondary'] = Variable<bool>(eraseWithSecondary);
     return map;
   }
 
@@ -532,6 +567,7 @@ class Chat extends DataClass implements Insertable<Chat> {
       peerDisplayName: peerDisplayName == null && nullToAbsent
           ? const Value.absent()
           : Value(peerDisplayName),
+      eraseWithSecondary: Value(eraseWithSecondary),
     );
   }
 
@@ -556,6 +592,7 @@ class Chat extends DataClass implements Insertable<Chat> {
       refreshProfile: serializer.fromJson<bool>(json['refreshProfile']),
       directoryCheckedAt: serializer.fromJson<int>(json['directoryCheckedAt']),
       peerDisplayName: serializer.fromJson<String?>(json['peerDisplayName']),
+      eraseWithSecondary: serializer.fromJson<bool>(json['eraseWithSecondary']),
     );
   }
   @override
@@ -577,6 +614,7 @@ class Chat extends DataClass implements Insertable<Chat> {
       'refreshProfile': serializer.toJson<bool>(refreshProfile),
       'directoryCheckedAt': serializer.toJson<int>(directoryCheckedAt),
       'peerDisplayName': serializer.toJson<String?>(peerDisplayName),
+      'eraseWithSecondary': serializer.toJson<bool>(eraseWithSecondary),
     };
   }
 
@@ -596,6 +634,7 @@ class Chat extends DataClass implements Insertable<Chat> {
     bool? refreshProfile,
     int? directoryCheckedAt,
     Value<String?> peerDisplayName = const Value.absent(),
+    bool? eraseWithSecondary,
   }) => Chat(
     peerId: peerId ?? this.peerId,
     peerUsername: peerUsername ?? this.peerUsername,
@@ -614,6 +653,7 @@ class Chat extends DataClass implements Insertable<Chat> {
     peerDisplayName: peerDisplayName.present
         ? peerDisplayName.value
         : this.peerDisplayName,
+    eraseWithSecondary: eraseWithSecondary ?? this.eraseWithSecondary,
   );
   Chat copyWithCompanion(ChatsCompanion data) {
     return Chat(
@@ -654,6 +694,9 @@ class Chat extends DataClass implements Insertable<Chat> {
       peerDisplayName: data.peerDisplayName.present
           ? data.peerDisplayName.value
           : this.peerDisplayName,
+      eraseWithSecondary: data.eraseWithSecondary.present
+          ? data.eraseWithSecondary.value
+          : this.eraseWithSecondary,
     );
   }
 
@@ -674,7 +717,8 @@ class Chat extends DataClass implements Insertable<Chat> {
           ..write('profileSentVersion: $profileSentVersion, ')
           ..write('refreshProfile: $refreshProfile, ')
           ..write('directoryCheckedAt: $directoryCheckedAt, ')
-          ..write('peerDisplayName: $peerDisplayName')
+          ..write('peerDisplayName: $peerDisplayName, ')
+          ..write('eraseWithSecondary: $eraseWithSecondary')
           ..write(')'))
         .toString();
   }
@@ -696,6 +740,7 @@ class Chat extends DataClass implements Insertable<Chat> {
     refreshProfile,
     directoryCheckedAt,
     peerDisplayName,
+    eraseWithSecondary,
   );
   @override
   bool operator ==(Object other) =>
@@ -715,7 +760,8 @@ class Chat extends DataClass implements Insertable<Chat> {
           other.profileSentVersion == this.profileSentVersion &&
           other.refreshProfile == this.refreshProfile &&
           other.directoryCheckedAt == this.directoryCheckedAt &&
-          other.peerDisplayName == this.peerDisplayName);
+          other.peerDisplayName == this.peerDisplayName &&
+          other.eraseWithSecondary == this.eraseWithSecondary);
 }
 
 class ChatsCompanion extends UpdateCompanion<Chat> {
@@ -734,6 +780,7 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
   final Value<bool> refreshProfile;
   final Value<int> directoryCheckedAt;
   final Value<String?> peerDisplayName;
+  final Value<bool> eraseWithSecondary;
   final Value<int> rowid;
   const ChatsCompanion({
     this.peerId = const Value.absent(),
@@ -751,6 +798,7 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
     this.refreshProfile = const Value.absent(),
     this.directoryCheckedAt = const Value.absent(),
     this.peerDisplayName = const Value.absent(),
+    this.eraseWithSecondary = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ChatsCompanion.insert({
@@ -769,6 +817,7 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
     this.refreshProfile = const Value.absent(),
     this.directoryCheckedAt = const Value.absent(),
     this.peerDisplayName = const Value.absent(),
+    this.eraseWithSecondary = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : peerId = Value(peerId),
        peerUsername = Value(peerUsername),
@@ -792,6 +841,7 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
     Expression<bool>? refreshProfile,
     Expression<int>? directoryCheckedAt,
     Expression<String>? peerDisplayName,
+    Expression<bool>? eraseWithSecondary,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -812,6 +862,8 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
       if (directoryCheckedAt != null)
         'directory_checked_at': directoryCheckedAt,
       if (peerDisplayName != null) 'peer_display_name': peerDisplayName,
+      if (eraseWithSecondary != null)
+        'erase_with_secondary': eraseWithSecondary,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -832,6 +884,7 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
     Value<bool>? refreshProfile,
     Value<int>? directoryCheckedAt,
     Value<String?>? peerDisplayName,
+    Value<bool>? eraseWithSecondary,
     Value<int>? rowid,
   }) {
     return ChatsCompanion(
@@ -850,6 +903,7 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
       refreshProfile: refreshProfile ?? this.refreshProfile,
       directoryCheckedAt: directoryCheckedAt ?? this.directoryCheckedAt,
       peerDisplayName: peerDisplayName ?? this.peerDisplayName,
+      eraseWithSecondary: eraseWithSecondary ?? this.eraseWithSecondary,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -902,6 +956,9 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
     if (peerDisplayName.present) {
       map['peer_display_name'] = Variable<String>(peerDisplayName.value);
     }
+    if (eraseWithSecondary.present) {
+      map['erase_with_secondary'] = Variable<bool>(eraseWithSecondary.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -926,6 +983,7 @@ class ChatsCompanion extends UpdateCompanion<Chat> {
           ..write('refreshProfile: $refreshProfile, ')
           ..write('directoryCheckedAt: $directoryCheckedAt, ')
           ..write('peerDisplayName: $peerDisplayName, ')
+          ..write('eraseWithSecondary: $eraseWithSecondary, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4405,6 +4463,7 @@ typedef $$ChatsTableCreateCompanionBuilder = ChatsCompanion Function({
   Value<bool> refreshProfile,
   Value<int> directoryCheckedAt,
   Value<String?> peerDisplayName,
+  Value<bool> eraseWithSecondary,
   Value<int> rowid,
 });
 typedef $$ChatsTableUpdateCompanionBuilder = ChatsCompanion Function({
@@ -4423,6 +4482,7 @@ typedef $$ChatsTableUpdateCompanionBuilder = ChatsCompanion Function({
   Value<bool> refreshProfile,
   Value<int> directoryCheckedAt,
   Value<String?> peerDisplayName,
+  Value<bool> eraseWithSecondary,
   Value<int> rowid,
 });
 
@@ -4529,6 +4589,11 @@ class $$ChatsTableFilterComposer extends Composer<_$AppDatabase, $ChatsTable> {
 
   ColumnFilters<String> get peerDisplayName => $composableBuilder(
     column: $table.peerDisplayName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get eraseWithSecondary => $composableBuilder(
+    column: $table.eraseWithSecondary,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4641,6 +4706,11 @@ class $$ChatsTableOrderingComposer
     column: $table.peerDisplayName,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get eraseWithSecondary => $composableBuilder(
+    column: $table.eraseWithSecondary,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ChatsTableAnnotationComposer
@@ -4719,6 +4789,11 @@ class $$ChatsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get eraseWithSecondary => $composableBuilder(
+    column: $table.eraseWithSecondary,
+    builder: (column) => column,
+  );
+
   Expression<T> messagesRefs<T extends Object>(
     Expression<T> Function($$MessagesTableAnnotationComposer a) f,
   ) {
@@ -4788,6 +4863,7 @@ class $$ChatsTableTableManager
                 Value<bool> refreshProfile = const Value.absent(),
                 Value<int> directoryCheckedAt = const Value.absent(),
                 Value<String?> peerDisplayName = const Value.absent(),
+                Value<bool> eraseWithSecondary = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ChatsCompanion(
                 peerId: peerId,
@@ -4805,6 +4881,7 @@ class $$ChatsTableTableManager
                 refreshProfile: refreshProfile,
                 directoryCheckedAt: directoryCheckedAt,
                 peerDisplayName: peerDisplayName,
+                eraseWithSecondary: eraseWithSecondary,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4824,6 +4901,7 @@ class $$ChatsTableTableManager
                 Value<bool> refreshProfile = const Value.absent(),
                 Value<int> directoryCheckedAt = const Value.absent(),
                 Value<String?> peerDisplayName = const Value.absent(),
+                Value<bool> eraseWithSecondary = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ChatsCompanion.insert(
                 peerId: peerId,
@@ -4841,6 +4919,7 @@ class $$ChatsTableTableManager
                 refreshProfile: refreshProfile,
                 directoryCheckedAt: directoryCheckedAt,
                 peerDisplayName: peerDisplayName,
+                eraseWithSecondary: eraseWithSecondary,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

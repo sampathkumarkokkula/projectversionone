@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/models.dart';
 import 'providers.dart';
 
-enum AppPhase { onboarding, locked, unlocked, deleted }
+enum AppPhase { onboarding, locked, unlocked, deleted, signedOut }
 
 @immutable
 class SessionState {
@@ -37,7 +37,7 @@ class SessionController extends Notifier<SessionState> {
   }
 
   /// Verifies the password. A secondary-password unlock first wipes every
-  /// timer-enabled chat (and queues wipe commands to the peers), then unlocks
+  /// selected chat (and queues wipe commands to the peers), then unlocks
   /// exactly like the main password: same screens, same timing, no message.
   Future<UnlockResult> unlock(String password) async {
     final services = ref.read(servicesProvider);
@@ -89,6 +89,12 @@ class SessionController extends Notifier<SessionState> {
   void markDeleted() {
     _graceTimer?.cancel();
     state = const SessionState(AppPhase.deleted);
+  }
+
+  /// Signed out and this phone erased; reopening BVM starts at sign-in.
+  void markSignedOut() {
+    _graceTimer?.cancel();
+    state = const SessionState(AppPhase.signedOut);
   }
 
   void appHidden() {

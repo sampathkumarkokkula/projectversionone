@@ -88,13 +88,22 @@ class _RootGate extends ConsumerWidget {
       AppPhase.onboarding => const OnboardingFlow(),
       AppPhase.locked => const LockScreen(),
       AppPhase.unlocked => const ChatListScreen(),
-      AppPhase.deleted => const _AccountDeletedScreen(),
+      AppPhase.deleted => const _ClosedScreen(
+          'Your account was deleted from the server and all data was erased from this phone.',
+        ),
+      AppPhase.signedOut => const _ClosedScreen(
+          'You are signed out and BVM was erased from this phone. Open BVM again to sign in with '
+          'any account.',
+        ),
     };
   }
 }
 
-class _AccountDeletedScreen extends StatelessWidget {
-  const _AccountDeletedScreen();
+/// Everything local is gone; the app must start fresh, so only "close" remains.
+class _ClosedScreen extends StatelessWidget {
+  const _ClosedScreen(this.message);
+
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -103,10 +112,7 @@ class _AccountDeletedScreen extends StatelessWidget {
         children: [
           const Icon(Icons.check_circle_outline, size: 56),
           const SizedBox(height: 16),
-          const Text(
-            'Your account was deleted from the server and all data was erased from this phone.',
-            textAlign: TextAlign.center,
-          ),
+          Text(message, textAlign: TextAlign.center),
           const SizedBox(height: 24),
           BusyButton(label: 'Close BVM', onPressed: () => SystemNavigator.pop()),
         ],

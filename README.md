@@ -60,7 +60,8 @@ Status: **milestone M1 (release APK), feature update v2**. See
 |---|---|
 | Chat history only on the two phones | SQLCipher-encrypted database, key in the Android Keystore. The server is a thin relay + directory + key store and deletes each envelope as soon as it is delivered. |
 | App lock | Password on every start; 60 s grace period when switching apps; no biometrics. |
-| Secondary (duress) password | Unlocks exactly like the main one, but first silently deletes every chat that has an auto-delete timer, on this phone and (by an encrypted command) on the other person's phone. Settings never reveal whether one is set. "Forgot password" deletes timer chats before the reset. |
+| Secondary password | Unlocks exactly like the main one, but first silently deletes the chats **you selected** (Settings > Chats erased by secondary password), on this phone and (by an encrypted command) on the other person's phone. Other chats are untouched. Settings never reveal whether one is set, and inside such a session the selection screen shows a decoy. "Forgot password" deletes the selected chats before the reset. |
+| Sign out | Settings > Sign out: saves the encrypted backup, then erases BVM from this phone so you can sign in with another account. The account stays; signing in again restores passwords and contacts (chats empty). |
 | Device hardening | Screenshots and screen recording blocked, blank app-switcher preview, no cloud backup or device transfer, incognito keyboard, no online status or last seen, no contact upload. |
 | Safety number | Chat info shows a 60-digit number to compare in person; key changes are announced in the chat. |
 | One phone per account | Signing in on a new phone moves the account; the old phone stops sending and receiving and can take it back with an e-mail code. |
@@ -267,7 +268,7 @@ The script creates the upload keystore on first use
 random password in `android\key.properties`, both git-ignored), regenerates the
 Drift code, runs the tests, builds an obfuscated, R8-shrunk release APK with
 `--dart-define-from-file=.env`, and writes `dist\bvm-<version>-release.apk`
-(for example `bvm-1.3.0-4-release.apk`; the version comes from `pubspec.yaml`) plus
+(for example `bvm-1.4.0-5-release.apk`; the version comes from `pubspec.yaml`) plus
 a `.sha256` file. **Back up `.secrets\` and `android\key.properties` offline**;
 updates must be signed with the same key. Use `-SplitPerAbi` for smaller
 per-architecture APKs, `-SkipTests` to skip the tests.
@@ -277,7 +278,7 @@ Without `.env`, the APK builds but opens a "not configured" screen.
 ## 5. Install
 
 * **adb:** enable Developer options > USB debugging on the phone, connect it, then
-  `.\.toolchain\android-sdk\platform-tools\adb.exe install -r dist\bvm-1.3.0-4-release.apk`
+  `.\.toolchain\android-sdk\platform-tools\adb.exe install -r dist\bvm-1.4.0-5-release.apk`
 * **Direct transfer:** copy the APK to the phone (USB, cable, local share), open
   it in Files and allow "Install unknown apps" for that app when Android asks.
   Compare the SHA-256 from the `.sha256` file if the transfer path is not trusted.

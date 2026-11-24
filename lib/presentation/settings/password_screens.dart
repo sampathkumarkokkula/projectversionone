@@ -136,7 +136,8 @@ class SecondaryPasswordScreen extends ConsumerWidget {
     return _PasswordChangeForm(
       title: 'Secondary password',
       explanation: 'Enter your current password, then the secondary password you want to use. '
-          'Leave the new fields empty to remove it.',
+          'Leave the new fields empty to remove it. Choose which chats it erases under '
+          'Settings > Chats erased by secondary password.',
       newLabel: 'Secondary password',
       allowEmpty: true,
       onSave: (current, next) => ref.read(servicesProvider).lock.setSecondary(

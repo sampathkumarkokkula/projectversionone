@@ -104,8 +104,11 @@ one phone and an emulator with a "Google Play" image) and two accounts.
 - [ ] Notification with BVM closed, within seconds (Firebase) and without
   Firebase (up to 15 minutes).
 - [ ] Display name and profile picture appear on the other phone.
-- [ ] Timer 1 day on a chat; secondary password unlock wipes that chat on both
-  phones; the chat without a timer stays.
+- [ ] Select one chat under Settings > Chats erased by secondary password;
+  unlock with the secondary password: that chat is empty on both phones, the
+  other chats stay, and the selection screen now shows nothing selected.
+- [ ] Sign out, sign in with a second account, sign out, sign back in with the
+  first: passwords and contacts return, chats empty.
 - [ ] Reinstall on one phone, sign in, enter the old password: contacts,
   name, picture and both passwords are back, chats empty; the other phone sees
   the security-code notice and messages flow again.

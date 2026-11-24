@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/account_deletion.dart';
+import '../../app/sign_out.dart';
 import '../../core/env.dart';
 import '../../data/local/app_database.dart' show selfAvatarId;
 import '../providers.dart';
@@ -12,6 +13,7 @@ import '../util/format.dart';
 import '../widgets/avatar.dart';
 import '../widgets/common.dart';
 import 'blocked_users_screen.dart';
+import 'erase_chats_screen.dart';
 import 'password_screens.dart';
 import 'privacy_policy_screen.dart';
 import 'profile_actions.dart';
@@ -95,6 +97,12 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => open(const SecondaryPasswordScreen()),
           ),
           ListTile(
+            leading: const Icon(Icons.delete_sweep_outlined),
+            title: const Text('Chats erased by secondary password'),
+            subtitle: const Text('Choose which conversations it deletes'),
+            onTap: () => open(const EraseChatsScreen()),
+          ),
+          ListTile(
             leading: const Icon(Icons.lock_outline),
             title: const Text('Lock now'),
             onTap: () => ref.read(sessionProvider.notifier).lock(),
@@ -124,6 +132,12 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const Divider(),
           ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('Sign out'),
+            subtitle: const Text('Use BVM with another account. Erases chats on this phone.'),
+            onTap: () => _confirmSignOut(context, ref),
+          ),
+          ListTile(
             leading: Icon(Icons.delete_forever_outlined, color: scheme.error),
             title: Text('Delete my account', style: TextStyle(color: scheme.error)),
             onTap: () => _confirmDelete(context, ref),
@@ -132,6 +146,66 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sign out?'),
+        content: const Text(
+          'Your account stays. Your passwords, name, picture and contact list are saved (encrypted) '
+          'so you get them back when you sign in again, here or on another phone.\n\n'
+          'All chats and photos on this phone are erased: chat history is never stored on the '
+          'server. Your contacts will see that your security code changed when you sign in again.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Sign out')),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    if (!await _runSignOut(context, ref, force: false) && context.mounted) {
+      final anyway = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Contact list not saved'),
+          content: const Text(
+            'BVM could not reach the server to save your contact list and settings. If you sign out '
+            'now, you may have to set up passwords and find your contacts again.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Sign out anyway')),
+          ],
+        ),
+      );
+      if (anyway == true && context.mounted) await _runSignOut(context, ref, force: true);
+    }
+  }
+
+  /// False when the backup could not be saved (nothing was erased).
+  Future<bool> _runSignOut(BuildContext context, WidgetRef ref, {required bool force}) async {
+    final navigator = Navigator.of(context);
+    unawaited(showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const PopScope(canPop: false, child: Center(child: CircularProgressIndicator())),
+    ));
+    try {
+      await signOutAndErase(ref.read(servicesProvider), ref.read(runtimeProvider), force: force);
+      navigator.pop();
+      ref.read(sessionProvider.notifier).markSignedOut();
+      return true;
+    } on BackupNotSavedException {
+      navigator.pop();
+      return false;
+    } on Object catch (e) {
+      navigator.pop();
+      if (context.mounted) showSnack(context, describeError(e));
+      return true;
+    }
   }
 
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {

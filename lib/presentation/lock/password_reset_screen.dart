@@ -91,11 +91,12 @@ class _PasswordResetScreenState extends ConsumerState<PasswordResetScreen> {
           Text('Reset your password?', style: text.headlineSmall),
           const SizedBox(height: 12),
           const Text(
-            'To protect you, every chat that has an auto-delete timer is permanently deleted '
-            'from this phone before the reset. Chats without a timer are kept. This cannot be undone.',
+            'To protect you, every chat selected under "Chats erased by secondary password" is '
+            'permanently deleted from this phone before the reset. Other chats are kept. This '
+            'cannot be undone.',
           ),
           const SizedBox(height: 24),
-          BusyButton(label: 'Delete timer chats and continue', busy: _busy, onPressed: _confirmWipe),
+          BusyButton(label: 'Delete selected chats and continue', busy: _busy, onPressed: _confirmWipe),
           TextButton(onPressed: _busy ? null : () => Navigator.of(context).pop(), child: const Text('Cancel')),
         ],
       _ResetStep.sendCode => [

@@ -214,14 +214,15 @@ class Device {
   late final SessionEstablisher sessions;
   late final SyncEngine sync;
 
-  /// Creates a chat with an established session.
-  Future<void> connect(String peerId, {int? timerSeconds}) async {
+  /// Creates a chat with an established session. [eraseWithSecondary]
+  /// (default: whether a timer is set) selects it for the secondary password.
+  Future<void> connect(String peerId, {int? timerSeconds, bool? eraseWithSecondary}) async {
     crypto.sessions.add(peerId);
     await messages.ensureChat(peer(peerId));
-    if (timerSeconds != null) {
-      await (db.update(db.chats)..where((c) => c.peerId.equals(peerId)))
-          .write(ChatsCompanion(timerSeconds: Value(timerSeconds)));
-    }
+    await (db.update(db.chats)..where((c) => c.peerId.equals(peerId))).write(ChatsCompanion(
+          timerSeconds: Value(timerSeconds),
+          eraseWithSecondary: Value(eraseWithSecondary ?? timerSeconds != null),
+        ));
   }
 
   Future<List<Message>> messagesWith(String peerId) =>

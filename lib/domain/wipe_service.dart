@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:drift/drift.dart';
@@ -5,11 +6,13 @@ import 'package:drift/drift.dart';
 import '../core/clock.dart';
 import '../core/log.dart';
 import '../data/local/app_database.dart';
+import 'models.dart';
 import 'outbound.dart';
 import 'payload.dart';
 import 'ports.dart';
 
-/// Deletes every chat that has an auto-delete timer.
+/// Deletes the conversations the user selected (Settings > Chats erased by
+/// the secondary password).
 ///
 /// * [duressWipe] runs right after an unlock with the secondary password:
 ///   local deletion plus an authenticated (end-to-end-encrypted) wipe command
@@ -21,8 +24,12 @@ import 'ports.dart';
 /// * [wipeBeforePasswordReset] runs before any "forgot password" reset so a
 ///   reset cannot be used to get around the secondary password.
 ///
-/// The chat entries stay (with their timer), only the conversations go, which
-/// looks the same as messages that simply expired.
+/// The chat entries stay, only the conversations go.
+///
+/// The selection screen never shows the real selection inside a session that
+/// was unlocked with the secondary password: there it shows (and edits) a
+/// separate decoy selection that has no effect, so the person holding the
+/// phone cannot see which chats were protected.
 class WipeService {
   WipeService({required this.db, required this.outbound, required this.clock});
 
@@ -31,13 +38,38 @@ class WipeService {
   final Clock clock;
 
   static const _pendingPrefix = 'wipe.pending.';
+  static const _decoyKey = 'wipe.decoy';
+
+  /// Ids of the chats shown as selected in a session unlocked with [mode].
+  Future<Set<String>> selectedChats(UnlockMode mode) async {
+    if (mode == UnlockMode.duress) {
+      final raw = await db.read(_decoyKey);
+      if (raw == null) return {};
+      try {
+        return {for (final v in jsonDecode(raw) as List<dynamic>) if (v is String) v};
+      } on FormatException {
+        return {};
+      }
+    }
+    return {for (final c in await db.chatsErasedWithSecondary()) c.peerId};
+  }
+
+  Future<void> setSelected(String peerId, {required bool selected, required UnlockMode mode}) async {
+    if (mode == UnlockMode.duress) {
+      final ids = await selectedChats(mode);
+      selected ? ids.add(peerId) : ids.remove(peerId);
+      await db.write(_decoyKey, jsonEncode(ids.toList()));
+      return;
+    }
+    await db.setEraseWithSecondary(peerId, selected);
+  }
 
   Future<int> duressWipe() => _wipeAndCheckpoint(relayToPeers: true);
 
   Future<int> wipeBeforePasswordReset() => _wipeAndCheckpoint(relayToPeers: false);
 
   Future<int> _wipeAndCheckpoint({required bool relayToPeers}) async {
-    final count = await _wipeTimerChats(relayToPeers: relayToPeers);
+    final count = await _wipeSelectedChats(relayToPeers: relayToPeers);
     try {
       // Make sure deleted pages are not left behind in the write-ahead log.
       await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE)');
@@ -47,9 +79,9 @@ class WipeService {
     return count;
   }
 
-  Future<int> _wipeTimerChats({required bool relayToPeers}) => db.transaction(() async {
+  Future<int> _wipeSelectedChats({required bool relayToPeers}) => db.transaction(() async {
         final now = clock.nowMs();
-        final chats = await db.timerChats();
+        final chats = await db.chatsErasedWithSecondary();
         for (final chat in chats) {
           // Photos are deleted with their messages; half-received ones too.
           await db.deleteAllMessagesOf(chat.peerId);

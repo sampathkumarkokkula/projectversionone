@@ -50,6 +50,13 @@ class Chats extends Table {
   /// the username.
   TextColumn get peerDisplayName => text().nullable()();
 
+  // ---- schema v4 ----
+
+  /// Chosen by the user (Settings > Chats erased by the secondary password):
+  /// unlocking with the secondary password deletes this conversation here and
+  /// on the peer's phone.
+  BoolColumn get eraseWithSecondary => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column<Object>> get primaryKey => {peerId};
 }
@@ -233,7 +240,7 @@ class AppDatabase extends _$AppDatabase implements LocalSettings {
   AppDatabase(super.executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -252,6 +259,12 @@ class AppDatabase extends _$AppDatabase implements LocalSettings {
           }
           if (from < 3) {
             await m.addColumn(chats, chats.peerDisplayName);
+          }
+          if (from < 4) {
+            await m.addColumn(chats, chats.eraseWithSecondary);
+            // Before v4 the secondary password erased every timer chat; keep
+            // exactly those selected so an update removes no protection.
+            await customStatement('UPDATE chats SET erase_with_secondary = 1 WHERE timer_seconds IS NOT NULL');
           }
         },
         beforeOpen: (details) async {
@@ -289,7 +302,12 @@ class AppDatabase extends _$AppDatabase implements LocalSettings {
   Stream<Chat?> watchChat(String peerId) =>
       (select(chats)..where((t) => t.peerId.equals(peerId))).watchSingleOrNull();
 
-  Future<List<Chat>> timerChats() => (select(chats)..where((t) => t.timerSeconds.isNotNull())).get();
+  /// Chats the user selected to be erased by the secondary password.
+  Future<List<Chat>> chatsErasedWithSecondary() =>
+      (select(chats)..where((t) => t.eraseWithSecondary.equals(true))).get();
+
+  Future<void> setEraseWithSecondary(String peerId, bool erase) =>
+      (update(chats)..where((t) => t.peerId.equals(peerId))).write(ChatsCompanion(eraseWithSecondary: Value(erase)));
 
   Future<int> countTimerChats({String? excluding}) async {
     final query = selectOnly(chats)..addColumns([chats.peerId.count()]);

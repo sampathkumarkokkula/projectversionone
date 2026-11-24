@@ -137,15 +137,15 @@ from a peer's message, so a peer cannot pose as someone else.
 Unlocking with it is indistinguishable on screen from a normal unlock. Before
 the chat list is shown, in one database transaction, BVM:
 
-1. deletes the full conversation (all messages, including ones sent before the
-   timer was enabled) of **every chat that has an auto-delete timer**;
+1. deletes the full conversation (all messages and photos) of **every chat the
+   user selected** under Settings > Chats erased by secondary password (v1.4;
+   chats that had a timer before the update start out selected);
 2. drops that chat's unsent messages and pending deletes, and records a wipe
    time so messages sent before it that arrive later are discarded;
 3. queues an end-to-end-encrypted wipe command for each such peer in the local
    outbox.
 
-The chat entries and their timers stay, so the list looks like chats whose
-messages simply expired. The outbox is sent as soon as the relay is reachable;
+The chat entries stay, empty. The outbox is sent as soon as the relay is reachable;
 the server holds the command until the peer's app collects it (up to 30 days).
 The peer's app deletes the same conversation silently. No banner, toast,
 notification or delay is shown on either phone. Wipe commands do not trigger a
@@ -158,11 +158,19 @@ person holding the phone believes are "the" passwords:
 * "Change password" changes the secondary password (the main one keeps working).
 * "Secondary password" changes (or, if left empty, replaces with a random
   value) the **main** password. The owner then recovers with "Forgot password".
+* "Chats erased by secondary password" shows and edits a separate decoy
+  selection (initially empty) that has no effect, so the real selection is
+  never visible in such a session.
+
+The real selection is stored in the local encrypted database and in the
+encrypted account backup. Someone who knows the secondary password and holds
+a copy of the server database could decrypt that backup copy and see which
+contacts were selected (not their messages).
 
 ### Forgot password
 
-Before anything else, "Forgot password" permanently deletes every chat that has
-an auto-delete timer on this phone (local only, no relay), so a reset cannot be
+Before anything else, "Forgot password" permanently deletes every selected
+chat on this phone (local only, no relay), so a reset cannot be
 used to get around the secondary password. Then the account e-mail receives a
 one-time code, and new passwords are set.
 
